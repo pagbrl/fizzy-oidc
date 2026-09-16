@@ -1,0 +1,22 @@
+services:
+  test:
+    build: .
+    image: fizzy-oidc-dev
+    volumes:
+      - .:/gem
+      - bundle:/bundle
+    command: bundle exec rake test
+
+  shell:
+    build: .
+    image: fizzy-oidc-dev
+    profiles: [dev]
+    volumes:
+      - .:/gem
+      - bundle:/bundle
+    command: bash
+    stdin_open: true
+    tty: true
+
+volumes:
+  bundle:

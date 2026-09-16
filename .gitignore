@@ -1,0 +1,4 @@
+/tmp/
+/pkg/
+*.gem
+.claude/worktrees/
