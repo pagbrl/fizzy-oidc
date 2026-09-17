@@ -116,6 +116,44 @@ docker run --rm -v "$PWD":/gem fizzy-oidc-dev
 
 The image is Ruby 3.4.8-slim with build tools + SQLite. Bundler installs into a named volume so rebuilds don't refetch gems.
 
+### Local stack (Fizzy + Keycloak)
+
+`compose.dev.yml` boots a real Fizzy checkout (pinned to `3068c2a7`) with this gem mounted in via `path:`, next to a Keycloak with the `fizzy` realm imported. This is the environment for step 3 of the upgrade checklist in [`AGENTS.md`](AGENTS.md) — the gem's own test suite runs against stubs and proves nothing about real Fizzy.
+
+```sh
+docker compose -f compose.dev.yml up --build
+```
+
+- Fizzy: http://localhost:3000
+- Keycloak: http://localhost:8080 (admin / admin), realm `fizzy`
+- Test users: `alice` (group `fizzy-admins`) and `bob` (group `eng-team`), password `password`
+
+Set `KEYCLOAK_PORT` if 8080 is taken: `KEYCLOAK_PORT=18080 docker compose -f compose.dev.yml up`.
+
+Fizzy runs inside Keycloak's network namespace, so `localhost:8080` resolves to Keycloak both in your browser and inside the Fizzy container. The issuer has to be spelled the same on both sides or issuer validation fails — this is the usual `localhost` vs Docker-service-name trap, and that is why both published ports hang off the `keycloak` service.
+
+Signing in does not complete against this stack yet. Three things block it, all of them found by standing the stack up: the gem's migration is never applied (its timestamp is older than Fizzy's schema version, so loading the schema marks it as already run and `identities.oidc_subject` never exists), the patched controllers redirect to `/auth/fizzy_oidc` with a GET while OmniAuth 2 accepts only POST, and discovery of an `http://` issuer is attempted over TLS (`SWD.url_builder` defaults to `URI::HTTPS`). Work around all three by hand and the whole chain — login, JIT provisioning, role and board reconciliation — does run.
+
+The database starts empty (no Fizzy seeds), so the first OIDC login bootstraps the account and becomes its `owner`. Boards named in `dev/fizzy_oidc.yml` are not created for you — the plugin never creates boards — so create `General`, `Backend` and `Infra` in the UI and log in again to see the mapping reconcile.
+
+What is where:
+
+| File | What |
+|---|---|
+| `compose.dev.yml` | The stack. Separate from `docker-compose.yml`, which is the gem's unit-test env — `bin/test` is untouched. |
+| `dev/Dockerfile.fizzy` | Clones Fizzy at the pin, appends `gem "fizzy-oidc", path: "/gem"` to its Gemfile, bundles. |
+| `dev/fizzy-entrypoint` | Waits for Keycloak, prepares the database, starts Puma. |
+| `dev/fizzy_oidc.yml` | The group-to-board mapping, mounted at `config/fizzy_oidc.yml`. |
+| `dev/keycloak/fizzy-realm.json` | Realm export: client `fizzy` (confidential, direct access grants off), client scope `groups` (Group Membership mapper, full path off, in ID/access/userinfo), groups, test users. Regenerate by configuring a live Keycloak and re-exporting; a hand-written `clientScopes` block replaces Keycloak's built-in scopes instead of adding to them. |
+
+The client secret in the realm and the users' passwords are local-only fixtures. Nothing in this stack is reachable from outside your machine.
+
+The realm also carries a second client, `smoke`, public and with direct access grants on. It exists so a `curl` can fetch a token without a browser — the `fizzy` client deliberately keeps direct access grants off:
+
+```sh
+docker compose -f compose.dev.yml exec fizzy bash -c 'T=$(curl -s -d client_id=smoke -d username=alice -d password=password -d grant_type=password -d "scope=openid email profile groups" "$FIZZY_OIDC_ISSUER/protocol/openid-connect/token" | ruby -rjson -e "puts JSON.parse(STDIN.read)[\"access_token\"]"); curl -s -H "Authorization: Bearer $T" "$FIZZY_OIDC_ISSUER/protocol/openid-connect/userinfo"'
+```
+
 ### Tests
 
 Minitest, SQLite `:memory:`, stub models that mirror Fizzy's interface — no Fizzy checkout needed to run the suite. See `test/test_helper.rb` for the schema and model stubs.
@@ -136,7 +174,6 @@ Coverage:
 - **Board auto-creation.** Boards in the mapping must already exist in Fizzy.
 - **Multi-tenant routing.** Assumes a single `Account`.
 - **RP-initiated logout.**
-- **End-to-end Docker stack** with Fizzy + a mock OIDC provider (Dex). Only the gem's test env is containerized today.
 
 ## Contributing
 

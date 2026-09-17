@@ -1,0 +1,42 @@
+# Local development only: a real Fizzy checkout with this gem bundled in via
+# path:. The gem's own unit-test image is the Dockerfile at the repo root —
+# this one is never used by bin/test.
+FROM ruby:3.4.8-slim
+
+# Keep in lockstep with the pin documented in AGENTS.md.
+ARG FIZZY_REF=3068c2a7
+
+RUN apt-get update -qq && apt-get install --no-install-recommends -y \
+      build-essential \
+      curl \
+      git \
+      libsqlite3-dev \
+      libssl-dev \
+      libvips \
+      libyaml-dev \
+      pkg-config \
+      sqlite3 \
+ && rm -rf /var/lib/apt/lists/*
+
+ENV BUNDLE_PATH=/usr/local/bundle \
+    BUNDLE_WITHOUT=test \
+    BUNDLE_JOBS=4 \
+    RAILS_ENV=development \
+    DATABASE_ADAPTER=sqlite
+
+WORKDIR /rails
+
+RUN git clone https://github.com/basecamp/fizzy.git . \
+ && git checkout --detach ${FIZZY_REF}
+
+# Just enough of the gem for Bundler to resolve it at build time; the working
+# copy is bind-mounted over /gem at run time.
+COPY fizzy-oidc.gemspec LICENSE README.md /gem/
+COPY lib/fizzy/oidc/version.rb /gem/lib/fizzy/oidc/version.rb
+
+RUN echo 'gem "fizzy-oidc", path: "/gem"' >> Gemfile && bundle install
+
+COPY dev/fizzy-entrypoint /usr/local/bin/fizzy-entrypoint
+
+ENTRYPOINT ["fizzy-entrypoint"]
+CMD ["bin/rails", "server", "-b", "0.0.0.0", "-p", "3000"]

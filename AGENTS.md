@@ -81,7 +81,6 @@ docker run --rm -v "$PWD":/gem fizzy-oidc-dev
 - **No multi-tenant routing.** `Account.first` wins.
 - **No RP-initiated logout.** `destroy` clears the local session only.
 - **No passkey authentication.** Passkeys are blocked at the controller; re-enable only if you want a second auth path alongside OIDC.
-- **No full end-to-end Docker stack yet.** Only the gem's own test env is containerized. A Fizzy + Dex + plugin compose stack is a potential follow-up.
 
 ## When upstream Fizzy changes
 
@@ -98,7 +97,7 @@ Before bumping the pin:
    - `app/models/account.rb` (`create_with_owner` signature)
    - `app/controllers/concerns/authentication.rb` (the `start_new_session_for` hook)
 2. Run the test suite against the stub models.
-3. Smoke-test against a Fizzy checkout with the gem path-mounted.
+3. Smoke-test against a Fizzy checkout with the gem path-mounted: `docker compose -f compose.dev.yml up --build` (see the README's "Local stack" section).
 
 ## Conventions
 

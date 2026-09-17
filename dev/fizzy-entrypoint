@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+until curl -fsS "${FIZZY_OIDC_ISSUER}/.well-known/openid-configuration" > /dev/null 2>&1; do
+  echo "waiting for Keycloak at ${FIZZY_OIDC_ISSUER} ..."
+  sleep 2
+done
+
+# Not db:prepare: that seeds Fizzy's three demo accounts, and the plugin
+# provisions into Account.first. An empty database lets the first OIDC login
+# bootstrap the account, which is the path worth smoke-testing.
+if [ ! -f storage/development.sqlite3 ]; then
+  bin/rails db:create db:schema:load
+fi
+bin/rails db:migrate
+
+exec "$@"

@@ -1,0 +1,55 @@
+# Local development stack: Fizzy with this gem path-mounted, against Keycloak.
+# The gem's unit tests live in docker-compose.yml — this file is separate on
+# purpose so bin/test keeps working.
+#
+#   docker compose -f compose.dev.yml up --build
+#
+# Set KEYCLOAK_PORT if 8080 is taken on your machine.
+#
+# Fizzy shares Keycloak's network namespace so that `localhost:8080` means the
+# same thing in the browser and inside the Fizzy container: the OIDC issuer has
+# to match byte for byte on both sides. That is also why both published ports
+# hang off the keycloak service.
+
+name: fizzy-oidc-dev
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HTTP_ENABLED: "true"
+      # Same number inside and out: the container port is what Fizzy talks to.
+      KC_HTTP_PORT: ${KEYCLOAK_PORT:-8080}
+    volumes:
+      - ./dev/keycloak/fizzy-realm.json:/opt/keycloak/data/import/fizzy-realm.json:ro
+    ports:
+      - "${KEYCLOAK_PORT:-8080}:${KEYCLOAK_PORT:-8080}" # Keycloak
+      - "3000:3000" # Fizzy, via the shared network namespace below
+
+  fizzy:
+    build:
+      context: .
+      dockerfile: dev/Dockerfile.fizzy
+    depends_on:
+      - keycloak
+    network_mode: "service:keycloak"
+    environment:
+      FIZZY_OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/fizzy
+      FIZZY_OIDC_CLIENT_ID: fizzy
+      FIZZY_OIDC_CLIENT_SECRET: fizzy-dev-secret
+      FIZZY_OIDC_REDIRECT_URI: http://localhost:3000/auth/fizzy_oidc/callback
+      FIZZY_OIDC_SCOPES: "openid email profile groups"
+      FIZZY_OIDC_GROUPS_CLAIM: groups
+      # Same default as Fizzy's own bin/dev: no jobs supervisor in the web process.
+      SOLID_QUEUE_IN_PUMA: "false"
+    volumes:
+      - .:/gem
+      - ./dev/fizzy_oidc.yml:/rails/config/fizzy_oidc.yml:ro
+      - fizzy-storage:/rails/storage
+
+volumes:
+  fizzy-storage:
