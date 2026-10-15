@@ -18,11 +18,11 @@ All five of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_
 
 | Upstream controller | Actions overridden | Effect |
 |---|---|---|
-| `SessionsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `SignupsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Sessions::MagicLinksController` | `show`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Signups::CompletionsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Sessions::PasskeysController` | `create` | Redirect to `/auth/fizzy_oidc` |
+| `SessionsController` | `new`, `create` | `new` renders the sign-in button, `create` redirects to it |
+| `SignupsController` | `new`, `create` | Redirect to the sign-in page |
+| `Sessions::MagicLinksController` | `show`, `create` | Redirect to the sign-in page |
+| `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
+| `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
 
 `SessionsController#destroy` (logout) is intentionally left alone.
 
@@ -60,6 +60,7 @@ Key files:
 - **Identity lookup is `(provider, sub)` first, email second.** The email fallback exists so pre-existing magic-link identities migrate cleanly on first OIDC login. Don't remove it without a migration plan.
 - **The first OIDC user bootstraps the Account** via `Account.create_with_owner`. If no Account exists, they become `owner`. This is intentional for single-tenant. Multi-tenant will need explicit account selection.
 - **The OIDC columns do not rely on the migration alone.** On a fresh database `db:prepare` loads Fizzy's schema and marks every older migration as run, so once Fizzy's schema version passed `20260412000001` (pin `3068c2a7`) a new install never got them. `Schema.ensure!` runs after `db:prepare`, `db:migrate` and `db:schema:load` (`engine.rb`, `rake_tasks`). Anything the gem adds to Fizzy's tables goes there, not in a migration only.
+- **The sign-in page is a POST button, and CSRF is checked by a real controller.** OmniAuth 2 answers a GET on `/auth/fizzy_oidc` with a 404, so the patched `SessionsController#new` renders `app/views/fizzy/oidc/sessions/new.html.erb` and every other patch redirects there. `RequestValidation` runs `ForgeryChecksController`'s `protect_from_forgery`; do not bring back `omniauth-rails_csrf_protection` (1.0.2 calls into a missing `action_name` on Rails 8.2, 2.0.1 loads `ActionController::Base` at require time and Fizzy no longer boots), and do not define a controller under `lib/` for the same reason.
 - **Pre-created members are linked by email on first login.** `Precreator` makes an identity with no OIDC subject; the Provisioner's email fallback is what attaches the subject to it. Removing that fallback strands every pre-created member.
 - **Boards are matched by `name` within the account.** Missing boards are logged and skipped — the provisioner does not auto-create boards.
 

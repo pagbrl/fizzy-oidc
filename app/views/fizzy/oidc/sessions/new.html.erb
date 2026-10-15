@@ -1,0 +1,13 @@
+<% @page_title = "Sign in" %>
+
+<div class="panel panel--centered flex flex-column gap-half">
+  <h1 class="txt-x-large font-weight-black margin-block-end">Get into Fizzy</h1>
+
+  <%# A POST, never a link: OmniAuth 2 starts the request phase on POST only,
+      with an authenticity token, so a third-party page cannot log anyone in.
+      Turbo off: the IdP's redirect is a full navigation, not a fetch. %>
+  <%= button_to "/auth/fizzy_oidc", method: :post, data: { turbo: false }, class: "btn btn--link center txt-medium" do %>
+    <span>Sign in</span>
+    <%= icon_tag "arrow-right" %>
+  <% end %>
+</div>

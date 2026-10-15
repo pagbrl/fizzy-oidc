@@ -97,11 +97,11 @@ keeps every board access granted in the meantime.
 
 | Upstream controller | Actions | Effect |
 |---|---|---|
-| `SessionsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `SignupsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Sessions::MagicLinksController` | `show`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Signups::CompletionsController` | `new`, `create` | Redirect to `/auth/fizzy_oidc` |
-| `Sessions::PasskeysController` | `create` | Redirect to `/auth/fizzy_oidc` |
+| `SessionsController` | `new`, `create` | `new` renders a sign-in button that POSTs to `/auth/fizzy_oidc`, `create` redirects to it |
+| `SignupsController` | `new`, `create` | Redirect to the sign-in page |
+| `Sessions::MagicLinksController` | `show`, `create` | Redirect to the sign-in page |
+| `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
+| `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
 
 Logout (`SessionsController#destroy`) is untouched.
 
@@ -151,7 +151,7 @@ Set `KEYCLOAK_PORT` if 8080 is taken: `KEYCLOAK_PORT=18080 docker compose -f com
 
 Fizzy runs inside Keycloak's network namespace, so `localhost:8080` resolves to Keycloak both in your browser and inside the Fizzy container. The issuer has to be spelled the same on both sides or issuer validation fails — this is the usual `localhost` vs Docker-service-name trap, and that is why both published ports hang off the `keycloak` service.
 
-Signing in does not complete against this stack yet. Three things block it, all of them found by standing the stack up: the gem's migration is never applied (its timestamp is older than Fizzy's schema version, so loading the schema marks it as already run and `identities.oidc_subject` never exists), the patched controllers redirect to `/auth/fizzy_oidc` with a GET while OmniAuth 2 accepts only POST, and discovery of an `http://` issuer is attempted over TLS (`SWD.url_builder` defaults to `URI::HTTPS`). Work around all three by hand and the whole chain — login, JIT provisioning, role and board reconciliation — does run.
+Two of the three things that blocked signing in here are fixed in the gem: the OIDC columns are added even when `db:prepare` loads Fizzy's schema (`Schema.ensure!`), and the sign-in page is a button that POSTs to `/auth/fizzy_oidc`, checked by a real controller (`RequestValidation`) instead of `omniauth-rails_csrf_protection`, which breaks on Fizzy's Rails 8.2. The third is this stack's alone: discovery of an `http://` issuer is attempted over TLS (`SWD.url_builder` defaults to `URI::HTTPS`), so a local `http://localhost` Keycloak still needs a hand workaround. An `https` issuer, as in production, signs in end to end.
 
 The database starts empty (no Fizzy seeds), so the first OIDC login bootstraps the account and becomes its `owner`. Boards named in `dev/fizzy_oidc.yml` are not created for you — the plugin never creates boards — so create `General`, `Backend` and `Infra` in the UI and log in again to see the mapping reconcile.
 

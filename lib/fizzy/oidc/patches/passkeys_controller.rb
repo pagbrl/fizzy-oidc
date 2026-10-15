@@ -3,7 +3,7 @@ module Fizzy
     module Patches
       module PasskeysController
         def create
-          redirect_to "/auth/fizzy_oidc", allow_other_host: false
+          redirect_to new_session_path
         end
       end
     end

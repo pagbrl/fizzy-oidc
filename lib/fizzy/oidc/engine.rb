@@ -1,7 +1,6 @@
 require "rails/engine"
 require "omniauth"
 require "omniauth_openid_connect"
-require "omniauth/rails_csrf_protection"
 
 module Fizzy
   module Oidc
@@ -36,6 +35,7 @@ module Fizzy
         end
 
         OmniAuth.config.path_prefix = "/auth"
+        OmniAuth.config.request_validation_phase = Fizzy::Oidc::RequestValidation.new
         OmniAuth.config.failure_raise_out_environments = []
         OmniAuth.config.on_failure = ->(env) {
           Fizzy::Oidc::CallbacksController.action(:failure).call(env)
