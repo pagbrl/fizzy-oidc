@@ -64,6 +64,25 @@ mappings:
 
 Boards marked `all_access: true` are granted automatically by Fizzy on user creation and are left untouched by this plugin. Only boards listed in the mapping are reconciled (added when earned, revoked when the user no longer has the group).
 
+## Creating members before their first login
+
+An outside system (for us, the community manager) can create a member before
+they ever log in, so it can put them on boards straight away:
+
+```
+POST /:account_slug/oidc/users
+Authorization: Bearer <personal access token of an admin, with write permission>
+Content-Type: application/json
+
+{"email_address": "alice@example.com", "name": "Alice"}
+```
+
+It answers `201` with the new user (`id`, `name`, `role`, `active`,
+`email_address`), or `200` with the existing one — the call is idempotent. The
+member is created verified, with the `member` role and no OIDC subject. On their
+first login the identity is found by email, linked to the subject, and the user
+keeps every board access granted in the meantime.
+
 ## What happens on each login
 
 1. Receives the OIDC callback at `/auth/fizzy_oidc/callback`.
@@ -171,7 +190,7 @@ Coverage:
 ## Not included (yet)
 
 - **SCIM / directory sync.** Deprovisioning only happens on a user's next login. Users who stop logging in retain stale access; run a periodic review or add SCIM later.
-- **Board auto-creation.** Boards in the mapping must already exist in Fizzy.
+- **Board auto-creation.** Boards in the mapping must already exist in Fizzy. Create them through Fizzy's own API (`POST /:account_slug/boards`).
 - **Multi-tenant routing.** Assumes a single `Account`.
 - **RP-initiated logout.**
 

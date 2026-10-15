@@ -16,3 +16,4 @@ end
 require "fizzy/oidc/config"
 require "fizzy/oidc/claims"
 require "fizzy/oidc/provisioner"
+require "fizzy/oidc/precreator"

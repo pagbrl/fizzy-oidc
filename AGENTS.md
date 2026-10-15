@@ -49,7 +49,9 @@ Key files:
 - `lib/fizzy/oidc/config.rb` — ENV + YAML config (Singleton with `reload!` for tests)
 - `lib/fizzy/oidc/claims.rb` — OmniAuth hash → normalized claims
 - `lib/fizzy/oidc/provisioner.rb` — the only place that writes to Fizzy's models
+- `lib/fizzy/oidc/precreator.rb` — creates a member before their first login
 - `app/controllers/fizzy/oidc/callbacks_controller.rb` — OIDC + failure endpoints
+- `app/controllers/fizzy/oidc/users_controller.rb` — `POST /:account_slug/oidc/users`, the Precreator behind Fizzy's own bearer-token auth and `ensure_admin`
 
 ## Non-obvious behaviors to preserve
 
@@ -57,6 +59,7 @@ Key files:
 - **Owners are never demoted.** `reconcile_role` early-returns on `user.owner?`. If you change this, you'll strand single-tenant installs where the IdP doesn't know about an "owner" group.
 - **Identity lookup is `(provider, sub)` first, email second.** The email fallback exists so pre-existing magic-link identities migrate cleanly on first OIDC login. Don't remove it without a migration plan.
 - **The first OIDC user bootstraps the Account** via `Account.create_with_owner`. If no Account exists, they become `owner`. This is intentional for single-tenant. Multi-tenant will need explicit account selection.
+- **Pre-created members are linked by email on first login.** `Precreator` makes an identity with no OIDC subject; the Provisioner's email fallback is what attaches the subject to it. Removing that fallback strands every pre-created member.
 - **Boards are matched by `name` within the account.** Missing boards are logged and skipped — the provisioner does not auto-create boards.
 
 ## Running tests
