@@ -1,10 +1,11 @@
 class AddOidcColumnsToIdentities < ActiveRecord::Migration[8.0]
-  def change
-    change_table :identities do |t|
-      t.string :oidc_subject
-      t.string :oidc_provider
-    end
+  def up
+    Fizzy::Oidc::Schema.ensure!(connection)
+  end
 
-    add_index :identities, [:oidc_provider, :oidc_subject], unique: true
+  def down
+    remove_index :identities, [:oidc_provider, :oidc_subject], if_exists: true
+    remove_column :identities, :oidc_provider, if_exists: true
+    remove_column :identities, :oidc_subject, if_exists: true
   end
 end

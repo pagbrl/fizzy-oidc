@@ -42,6 +42,14 @@ module Fizzy
         }
       end
 
+      rake_tasks do
+        %w[db:prepare db:migrate db:schema:load].each do |name|
+          next unless Rake::Task.task_defined?(name)
+
+          Rake::Task[name].enhance { Fizzy::Oidc::Schema.ensure! }
+        end
+      end
+
       config.to_prepare do
         require "fizzy/oidc/patches/sessions_controller"
         require "fizzy/oidc/patches/signups_controller"

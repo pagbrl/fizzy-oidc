@@ -59,6 +59,7 @@ Key files:
 - **Owners are never demoted.** `reconcile_role` early-returns on `user.owner?`. If you change this, you'll strand single-tenant installs where the IdP doesn't know about an "owner" group.
 - **Identity lookup is `(provider, sub)` first, email second.** The email fallback exists so pre-existing magic-link identities migrate cleanly on first OIDC login. Don't remove it without a migration plan.
 - **The first OIDC user bootstraps the Account** via `Account.create_with_owner`. If no Account exists, they become `owner`. This is intentional for single-tenant. Multi-tenant will need explicit account selection.
+- **The OIDC columns do not rely on the migration alone.** On a fresh database `db:prepare` loads Fizzy's schema and marks every older migration as run, so once Fizzy's schema version passed `20260412000001` (pin `3068c2a7`) a new install never got them. `Schema.ensure!` runs after `db:prepare`, `db:migrate` and `db:schema:load` (`engine.rb`, `rake_tasks`). Anything the gem adds to Fizzy's tables goes there, not in a migration only.
 - **Pre-created members are linked by email on first login.** `Precreator` makes an identity with no OIDC subject; the Provisioner's email fallback is what attaches the subject to it. Removing that fallback strands every pre-created member.
 - **Boards are matched by `name` within the account.** Missing boards are logged and skipped — the provisioner does not auto-create boards.
 

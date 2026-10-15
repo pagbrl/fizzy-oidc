@@ -127,6 +127,7 @@ require "fizzy/oidc/config"
 require "fizzy/oidc/claims"
 require "fizzy/oidc/provisioner"
 require "fizzy/oidc/precreator"
+require "fizzy/oidc/schema"
 
 module Fizzy::Oidc
   class Error < StandardError; end
