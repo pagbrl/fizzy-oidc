@@ -58,6 +58,12 @@ module Fizzy
         require "fizzy/oidc/patches/passkeys_controller"
 
         SessionsController.prepend(Fizzy::Oidc::Patches::SessionsController)
+        # Fizzy's CSP says form-action 'self', and browsers apply it to the
+        # redirects that follow a form submission: the sign-in button's POST
+        # would be stopped on its way to the IdP. Only this page needs it.
+        SessionsController.content_security_policy do |policy|
+          policy.form_action(*policy.directives.fetch("form-action", ["'self'"]), Fizzy::Oidc.config.issuer_origin)
+        end
         SignupsController.prepend(Fizzy::Oidc::Patches::SignupsController)
         Sessions::MagicLinksController.prepend(Fizzy::Oidc::Patches::MagicLinksController)
         Signups::CompletionsController.prepend(Fizzy::Oidc::Patches::CompletionsController)

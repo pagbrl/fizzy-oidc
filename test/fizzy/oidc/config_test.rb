@@ -8,6 +8,14 @@ class Fizzy::Oidc::ConfigTest < Minitest::Test
     assert_equal %w[openid email profile groups], Fizzy::Oidc.config.scopes
   end
 
+  def test_issuer_origin_drops_the_path_and_a_default_port
+    ENV["FIZZY_OIDC_ISSUER"] = "https://auth.example.org/realms/acme"
+    assert_equal "https://auth.example.org", Fizzy::Oidc.config.issuer_origin
+
+    ENV["FIZZY_OIDC_ISSUER"] = "http://localhost:8080/realms/acme"
+    assert_equal "http://localhost:8080", Fizzy::Oidc.config.issuer_origin
+  end
+
   def test_loads_account_name_from_yaml
     write_mapping(<<~YAML)
       account:

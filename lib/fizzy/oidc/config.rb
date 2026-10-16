@@ -1,5 +1,6 @@
 require "yaml"
 require "singleton"
+require "uri"
 
 module Fizzy
   module Oidc
@@ -7,6 +8,7 @@ module Fizzy
       include Singleton
 
       def issuer            = ENV.fetch("FIZZY_OIDC_ISSUER")
+      def issuer_origin     = URI(issuer).then { |u| "#{u.scheme}://#{u.host}#{":#{u.port}" unless u.port == u.default_port}" }
       def client_id         = ENV.fetch("FIZZY_OIDC_CLIENT_ID")
       def client_secret     = ENV.fetch("FIZZY_OIDC_CLIENT_SECRET")
       def redirect_uri      = ENV.fetch("FIZZY_OIDC_REDIRECT_URI", nil)
