@@ -7,4 +7,5 @@ Rails.application.routes.draw do
   get "/auth/failure", to: "fizzy/oidc/callbacks#failure", as: :fizzy_oidc_failure
 
   post "/oidc/users", to: "fizzy/oidc/users#create", defaults: { format: :json }, as: :fizzy_oidc_users
+  patch "/oidc/users/:id", to: "fizzy/oidc/users#update", defaults: { format: :json }, as: :fizzy_oidc_user
 end

@@ -83,6 +83,19 @@ member is created verified, with the `member` role and no OIDC subject. On their
 first login the identity is found by email, linked to the subject, and the user
 keeps every board access granted in the meantime.
 
+To change a member's address — the IdP has already proven the new one, while
+Fizzy's own API only lets users change their own address behind a mail:
+
+```
+PATCH /:account_slug/oidc/users/:user_id
+Authorization: Bearer <same admin token>
+
+{"email_address": "alice@new.example.com"}
+```
+
+`200` with the user, `422` if the address is invalid or taken. Their next login
+finds them by OIDC subject as before.
+
 ## What happens on each login
 
 1. Receives the OIDC callback at `/auth/fizzy_oidc/callback`.
