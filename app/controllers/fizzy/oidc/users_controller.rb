@@ -21,6 +21,9 @@ module Fizzy
         end
 
         user.identity.update!(email_address: params.require(:email_address))
+        # Fizzy caches each user's JSON under the user record: the address lives
+        # on the identity, so without this the API keeps serving the old one.
+        user.touch
         render json: user_json(user)
       rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
         render status: :unprocessable_entity, json: { error: error.message }
