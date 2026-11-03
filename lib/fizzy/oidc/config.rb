@@ -1,6 +1,7 @@
 require "yaml"
 require "singleton"
 require "uri"
+require "openid_connect"
 
 module Fizzy
   module Oidc
@@ -15,6 +16,10 @@ module Fizzy
       def scopes            = ENV.fetch("FIZZY_OIDC_SCOPES", "openid email profile groups").split
       def groups_claim      = ENV.fetch("FIZZY_OIDC_GROUPS_CLAIM", "groups")
       def provider_name     = ENV.fetch("FIZZY_OIDC_PROVIDER_NAME", "oidc")
+
+      def end_session_endpoint
+        @end_session_endpoint ||= OpenIDConnect::Discovery::Provider::Config.discover!(issuer).end_session_endpoint
+      end
 
       def account_name      = mapping.dig("account", "name") || ENV.fetch("FIZZY_OIDC_ACCOUNT_NAME", "Fizzy")
 
@@ -36,6 +41,7 @@ module Fizzy
 
       def reload!
         @mapping = nil
+        @end_session_endpoint = nil
       end
 
       private

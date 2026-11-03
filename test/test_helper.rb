@@ -40,6 +40,12 @@ ActiveRecord::Schema.define do
   end
   add_index :identities, [:oidc_provider, :oidc_subject], unique: true
 
+  create_table :sessions do |t|
+    t.integer :identity_id
+    t.text :oidc_id_token
+    t.timestamps
+  end
+
   create_table :accounts do |t|
     t.string :name, null: false
     t.timestamps
@@ -128,6 +134,7 @@ require "fizzy/oidc/claims"
 require "fizzy/oidc/provisioner"
 require "fizzy/oidc/precreator"
 require "fizzy/oidc/schema"
+require "fizzy/oidc/logout"
 
 module Fizzy::Oidc
   class Error < StandardError; end

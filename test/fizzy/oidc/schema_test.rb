@@ -16,4 +16,14 @@ class Fizzy::Oidc::SchemaTest < Minitest::Test
   ensure
     Identity.reset_column_information
   end
+
+  def test_adds_the_id_token_column_to_sessions
+    connection = ActiveRecord::Base.connection
+    connection.remove_column :sessions, :oidc_id_token
+
+    Fizzy::Oidc::Schema.ensure!
+    Fizzy::Oidc::Schema.ensure!
+
+    assert connection.column_exists?(:sessions, :oidc_id_token, :text)
+  end
 end

@@ -16,7 +16,7 @@ module Fizzy
         claims = Claims.from_omniauth(auth)
         identity, _user, account = Provisioner.new(claims).call
 
-        start_new_session_for(identity)
+        start_new_session_for(identity).update!(oidc_id_token: auth.credentials&.id_token)
         redirect_to main_app.landing_url(script_name: account.slug)
       rescue ProvisioningError => error
         Rails.logger.warn("[fizzy-oidc] provisioning failed: #{error.message}")
