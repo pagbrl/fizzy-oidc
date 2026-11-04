@@ -18,13 +18,13 @@ All five of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_
 
 | Upstream controller | Actions overridden | Effect |
 |---|---|---|
-| `SessionsController` | `new`, `create` | `new` renders the sign-in button, `create` redirects to it |
+| `SessionsController` | `new`, `create`, `destroy` | `new` renders the sign-in button, `create` redirects to it, `destroy` ends the SSO session too |
 | `SignupsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::MagicLinksController` | `show`, `create` | Redirect to the sign-in page |
 | `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
 
-`SessionsController#destroy` (logout) is intentionally left alone.
+`SessionsController#destroy` ends Fizzy's session, then sends the browser to the IdP's `end_session_endpoint` (read from discovery) with the `id_token_hint` kept at login and a `post_logout_redirect_uri` back to the sign-in page. If discovery fails, it falls back to Fizzy's own local logout.
 
 ## Architecture
 
@@ -50,6 +50,7 @@ Key files:
 - `lib/fizzy/oidc/claims.rb` — OmniAuth hash → normalized claims
 - `lib/fizzy/oidc/provisioner.rb` — the only place that writes to Fizzy's models
 - `lib/fizzy/oidc/precreator.rb` — creates a member before their first login
+- `lib/fizzy/oidc/logout.rb` — the IdP end-session URL the patched `destroy` redirects to
 - `app/controllers/fizzy/oidc/callbacks_controller.rb` — OIDC + failure endpoints
 - `app/controllers/fizzy/oidc/users_controller.rb` — `POST /:account_slug/oidc/users` (the Precreator) and `PATCH /:account_slug/oidc/users/:id` (rewrite the identity's email), behind Fizzy's own bearer-token auth and `ensure_admin`
 
@@ -59,9 +60,10 @@ Key files:
 - **Owners are never demoted.** `reconcile_role` early-returns on `user.owner?`. If you change this, you'll strand single-tenant installs where the IdP doesn't know about an "owner" group.
 - **Identity lookup is `(provider, sub)` first, email second.** The email fallback exists so pre-existing magic-link identities migrate cleanly on first OIDC login. Don't remove it without a migration plan.
 - **The first OIDC user bootstraps the Account** via `Account.create_with_owner`. If no Account exists, they become `owner`. This is intentional for single-tenant. Multi-tenant will need explicit account selection.
-- **The OIDC columns do not rely on the migration alone.** On a fresh database `db:prepare` loads Fizzy's schema and marks every older migration as run, so once Fizzy's schema version passed `20260412000001` (pin `3068c2a7`) a new install never got them. `Schema.ensure!` runs after `db:prepare`, `db:migrate` and `db:schema:load` (`engine.rb`, `rake_tasks`). Anything the gem adds to Fizzy's tables goes there, not in a migration only.
+- **The OIDC columns do not rely on the migration alone.** On a fresh database `db:prepare` loads Fizzy's schema and marks every older migration as run, so once Fizzy's schema version passed `20260412000001` (pin `3068c2a7`) a new install never got them. `Schema.ensure!` runs after `db:prepare`, `db:migrate` and `db:schema:load` (`engine.rb`, `rake_tasks`). Anything the gem adds to Fizzy's tables goes there, not in a migration only — `sessions.oidc_id_token` included.
 - **The sign-in page is a POST button, and CSRF is checked by a real controller.** OmniAuth 2 answers a GET on `/auth/fizzy_oidc` with a 404, so the patched `SessionsController#new` renders `app/views/fizzy/oidc/sessions/new.html.erb` and every other patch redirects there. `RequestValidation` runs `ForgeryChecksController`'s `protect_from_forgery`; do not bring back `omniauth-rails_csrf_protection` (1.0.2 calls into a missing `action_name` on Rails 8.2, 2.0.1 loads `ActionController::Base` at require time and Fizzy no longer boots), and do not define a controller under `lib/` for the same reason.
-- **The sign-in page widens `form-action` to the issuer's origin.** Fizzy's CSP says `form-action 'self'` and browsers enforce it on the redirects after a form POST, so without it the button's POST stops before reaching the IdP. Only `SessionsController` gets it (`engine.rb`).
+- **Every page widens `form-action` to the issuer's origin.** Fizzy's CSP says `form-action 'self'` and browsers enforce it on the redirects after a form POST, so without it the sign-in button's POST stops before reaching the IdP, and so does the sign-out button in the menu of every page. `ApplicationController` gets it (`engine.rb`).
+- **The ID token is kept on Fizzy's session** (`sessions.oidc_id_token`, set in the callback) so logout can send it as `id_token_hint` and skip the IdP's "log out?" screen. A session opened before the column existed has none: its logout sends `client_id` instead and the IdP asks once.
 - **Pre-created members are linked by email on first login.** `Precreator` makes an identity with no OIDC subject; the Provisioner's email fallback is what attaches the subject to it. Removing that fallback strands every pre-created member.
 - **Boards are matched by `name` within the account.** Missing boards are logged and skipped — the provisioner does not auto-create boards.
 
@@ -78,14 +80,14 @@ docker build -t fizzy-oidc-dev .
 docker run --rm -v "$PWD":/gem fizzy-oidc-dev
 ```
 
-21 tests / 51 assertions cover Claims parsing, Config/YAML, and the full Provisioner reconciliation matrix. Stub models live in `test/test_helper.rb` and do **not** include Fizzy's `User::Accessor#grant_access_to_boards` callback — tests assert provisioner-added accesses only, not Fizzy's auto-grant for `all_access: true` boards. Keep that in mind when writing new tests.
+The suite covers Claims parsing, Config/YAML, the Precreator, `Schema.ensure!`, the logout URL and the full Provisioner reconciliation matrix. Stub models live in `test/test_helper.rb` and do **not** include Fizzy's `User::Accessor#grant_access_to_boards` callback — tests assert provisioner-added accesses only, not Fizzy's auto-grant for `all_access: true` boards. Keep that in mind when writing new tests.
 
 ## What's deliberately NOT here
 
 - **No SCIM / directory sync.** Deprovisioning only happens on the user's next login. Stale users retain access indefinitely.
 - **No board auto-creation.** Admins pre-create boards; the plugin just grants access.
 - **No multi-tenant routing.** `Account.first` wins.
-- **No RP-initiated logout.** `destroy` clears the local session only.
+- **No back-channel logout.** Signing out elsewhere does not end Fizzy's session; only Fizzy's own logout reaches the IdP.
 - **No passkey authentication.** Passkeys are blocked at the controller; re-enable only if you want a second auth path alongside OIDC.
 
 ## When upstream Fizzy changes

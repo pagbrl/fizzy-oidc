@@ -110,13 +110,13 @@ finds them by OIDC subject as before.
 
 | Upstream controller | Actions | Effect |
 |---|---|---|
-| `SessionsController` | `new`, `create` | `new` renders a sign-in button that POSTs to `/auth/fizzy_oidc`, `create` redirects to it |
+| `SessionsController` | `new`, `create`, `destroy` | `new` renders a sign-in button that POSTs to `/auth/fizzy_oidc`, `create` redirects to it, `destroy` signs out of the IdP too |
 | `SignupsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::MagicLinksController` | `show`, `create` | Redirect to the sign-in page |
 | `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
 
-Logout (`SessionsController#destroy`) is untouched.
+Logout ends Fizzy's session, then redirects to the IdP's `end_session_endpoint` (from OIDC discovery) with `id_token_hint` and a `post_logout_redirect_uri` pointing at Fizzy's sign-in page — register `https://<fizzy-host>/*` as a valid post-logout redirect URI on the IdP client. If discovery fails, logout stays local.
 
 ## Development
 
@@ -190,14 +190,11 @@ docker compose -f compose.dev.yml exec fizzy bash -c 'T=$(curl -s -d client_id=s
 
 Minitest, SQLite `:memory:`, stub models that mirror Fizzy's interface — no Fizzy checkout needed to run the suite. See `test/test_helper.rb` for the schema and model stubs.
 
-```
-21 runs, 51 assertions, 0 failures, 0 errors, 0 skips
-```
-
 Coverage:
 
 - `test/fizzy/oidc/claims_test.rb` — OmniAuth hash parsing, configurable groups claim, missing-claim validation.
 - `test/fizzy/oidc/config_test.rb` — ENV + YAML loading, `group_boards` / `all_group_boards` / `admin_group` / `default_boards`.
+- `test/fizzy/oidc/logout_test.rb` — end-session URL with `id_token_hint`, `client_id` fallback, local logout when the IdP has no end-session endpoint or discovery fails.
 - `test/fizzy/oidc/provisioner_test.rb` — full reconciliation matrix: first-login bootstrap, role promotion/demotion, owner protection, board grants and revocations, `all_access` untouched, unknown boards skipped, email-fallback identity migration.
 
 ## Not included (yet)
@@ -205,7 +202,7 @@ Coverage:
 - **SCIM / directory sync.** Deprovisioning only happens on a user's next login. Users who stop logging in retain stale access; run a periodic review or add SCIM later.
 - **Board auto-creation.** Boards in the mapping must already exist in Fizzy. Create them through Fizzy's own API (`POST /:account_slug/boards`).
 - **Multi-tenant routing.** Assumes a single `Account`.
-- **RP-initiated logout.**
+- **Back-channel logout.** Signing out of another app does not end Fizzy's session.
 
 ## Contributing
 
