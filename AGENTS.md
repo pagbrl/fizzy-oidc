@@ -109,7 +109,7 @@ Before bumping the pin:
 
 ## Conventions
 
-- Ruby 3.4.8 (matches Fizzy's `.ruby-version`). Managed via `mise`.
+- Ruby 3.4 from `flake.nix` (`.envrc` → `use flake`). Fizzy pins 3.4.8; the dev shell takes nixpkgs' latest 3.4 patch, the Dockerfile keeps 3.4.8.
 - Minitest. No RSpec.
 - No comments unless WHY is non-obvious.
 - The gemspec's `add_development_dependency` list is the source of truth for test deps — don't add a Gemfile.

@@ -122,13 +122,13 @@ Logout ends Fizzy's session, then redirects to the IdP's `end_session_endpoint` 
 
 ### Requirements
 
-- Ruby 3.4.8 (matches Fizzy's `.ruby-version`) — `mise install` picks it up from `.mise.toml`.
+- Nix with direnv — `flake.nix` carries Ruby 3.4 (latest patch in nixpkgs; Fizzy pins 3.4.8) and the native libs; `direnv allow` or `nix develop` enters it.
 - Or: Docker, and nothing else.
 
 ### Local setup (native)
 
 ```sh
-bin/setup       # mise install + bundle install
+bin/setup       # bundle install
 bundle exec rake test
 ```
 
