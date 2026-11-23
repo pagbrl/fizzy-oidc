@@ -64,12 +64,14 @@ module Fizzy
         require "fizzy/oidc/patches/magic_links_controller"
         require "fizzy/oidc/patches/completions_controller"
         require "fizzy/oidc/patches/passkeys_controller"
+        require "fizzy/oidc/patches/assignments_controller"
 
         SessionsController.prepend(Fizzy::Oidc::Patches::SessionsController)
         SignupsController.prepend(Fizzy::Oidc::Patches::SignupsController)
         Sessions::MagicLinksController.prepend(Fizzy::Oidc::Patches::MagicLinksController)
         Signups::CompletionsController.prepend(Fizzy::Oidc::Patches::CompletionsController)
         Sessions::PasskeysController.prepend(Fizzy::Oidc::Patches::PasskeysController)
+        Cards::AssignmentsController.prepend(Fizzy::Oidc::Patches::AssignmentsController)
       end
     end
   end
