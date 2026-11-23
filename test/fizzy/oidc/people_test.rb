@@ -18,6 +18,24 @@ class Fizzy::Oidc::PeopleTest < Minitest::Test
     assert_equal [ alice, bob, @me ], Fizzy::Oidc::People.sharing_a_board_with(@me).alphabetically.to_a
   end
 
+  def test_the_search_finds_non_members_by_name_or_email_regardless_of_case
+    person("Alice Martin", boards: [ @general ])
+    bob = person("Bob Martin", email: "bob@example.com")
+    carol = person("Carol", email: "c.martin@example.com")
+    person("Dan Martin", active: false)
+
+    assert_equal [ bob, carol ], Fizzy::Oidc::People.addable_to(@general, " MARTIN ").to_a
+    assert_equal [ bob ], Fizzy::Oidc::People.addable_to(@general, "Bob@Example").to_a
+  end
+
+  def test_the_search_is_capped_and_needs_a_query
+    25.times { |i| person("Member #{i}") }
+
+    assert_equal Fizzy::Oidc::People::SEARCH_LIMIT, Fizzy::Oidc::People.addable_to(@general, "member").to_a.size
+    assert_empty Fizzy::Oidc::People.addable_to(@general, " ").to_a
+    assert_empty Fizzy::Oidc::People.addable_to(@general, "%").to_a
+  end
+
   private
     def person(name, boards: [], email: "#{name.parameterize}@example.com", active: true)
       identity = Identity.create!(email_address: email)
