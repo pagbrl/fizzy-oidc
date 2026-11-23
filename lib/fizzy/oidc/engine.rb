@@ -65,6 +65,9 @@ module Fizzy
         require "fizzy/oidc/patches/completions_controller"
         require "fizzy/oidc/patches/passkeys_controller"
         require "fizzy/oidc/patches/assignments_controller"
+        require "fizzy/oidc/patches/user_filtering"
+        require "fizzy/oidc/patches/menus_controller"
+        require "fizzy/oidc/patches/boards_controller"
 
         SessionsController.prepend(Fizzy::Oidc::Patches::SessionsController)
         SignupsController.prepend(Fizzy::Oidc::Patches::SignupsController)
@@ -72,6 +75,9 @@ module Fizzy
         Signups::CompletionsController.prepend(Fizzy::Oidc::Patches::CompletionsController)
         Sessions::PasskeysController.prepend(Fizzy::Oidc::Patches::PasskeysController)
         Cards::AssignmentsController.prepend(Fizzy::Oidc::Patches::AssignmentsController)
+        User::Filtering.prepend(Fizzy::Oidc::Patches::UserFiltering)
+        My::MenusController.prepend(Fizzy::Oidc::Patches::MenusController)
+        BoardsController.prepend(Fizzy::Oidc::Patches::BoardsController)
       end
     end
   end

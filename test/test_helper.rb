@@ -103,6 +103,8 @@ class User < ActiveRecord::Base
   enum :role, %w[ owner admin member system ].index_by(&:itself), scopes: false
 
   scope :owner, -> { where(active: true, role: :owner) }
+  scope :active, -> { where(active: true, role: %i[ owner admin member ]) }
+  scope :alphabetically, -> { order("lower(name)") }
 
   def admin?
     super || owner?
@@ -120,6 +122,7 @@ end
 class Board < ActiveRecord::Base
   belongs_to :account
   has_many :accesses, dependent: :destroy
+  has_many :users, through: :accesses
 end
 
 class Access < ActiveRecord::Base
@@ -135,6 +138,7 @@ require "fizzy/oidc/provisioner"
 require "fizzy/oidc/precreator"
 require "fizzy/oidc/schema"
 require "fizzy/oidc/logout"
+require "fizzy/oidc/people"
 
 module Fizzy::Oidc
   class Error < StandardError; end
