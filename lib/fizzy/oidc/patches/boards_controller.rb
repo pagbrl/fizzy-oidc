@@ -12,7 +12,19 @@ module Fizzy
         # #update revokes whoever is a member and missing from user_ids.
         def edit
           @selected_users = @board.users.active.alphabetically.includes(:identity, :account)
-          @unselected_users = People.addable_to(@board, params[:q]).includes(:identity)
+          @ticked_users = People.addable(@board).where(id: params[:user_ids]).alphabetically.includes(:identity)
+          @unselected_users = People.addable_to(@board, params[:q]).where.not(id: @ticked_users.select(:id)).includes(:identity)
+        end
+
+        # The search button submits the board's form, so the people ticked
+        # in an earlier search come back ticked. It never saves.
+        def update
+          if params[:search_people]
+            edit
+            render :edit
+          else
+            super
+          end
         end
       end
     end

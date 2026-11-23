@@ -3,7 +3,7 @@ require "fizzy/oidc/patches/boards_controller"
 
 class Fizzy::Oidc::BoardAccessTest < Minitest::Test
   class Controller
-    attr_reader :params, :selected_users, :unselected_users
+    attr_reader :params, :selected_users, :ticked_users, :unselected_users
 
     def initialize(board, params)
       @board, @params = board, params
@@ -37,6 +37,21 @@ class Fizzy::Oidc::BoardAccessTest < Minitest::Test
 
     assert_equal [ @alice, @bob ], access.selected_users.to_a
     assert_equal [ @carol ], access.unselected_users.to_a
+  end
+
+  def test_people_ticked_in_an_earlier_search_come_back_ticked
+    dan = person("Dan")
+    access = edit(q: "martin", user_ids: [ @alice.id, @bob.id, dan.id ])
+
+    assert_equal [ dan ], access.ticked_users.to_a
+    assert_equal [ @carol ], access.unselected_users.to_a
+  end
+
+  def test_a_ticked_person_found_again_is_listed_once_ticked
+    access = edit(q: "martin", user_ids: [ @alice.id, @bob.id, @carol.id ])
+
+    assert_equal [ @carol ], access.ticked_users.to_a
+    assert_empty access.unselected_users.to_a
   end
 
   private
