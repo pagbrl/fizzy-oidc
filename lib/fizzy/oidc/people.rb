@@ -9,16 +9,24 @@ module Fizzy
         user.account.users.active.where(id: Access.where(board_id: user.accesses.select(:board_id)).select(:user_id))
       end
 
-      def addable_to(board, query)
-        return User.none if query.blank?
+      def addable(board)
+        board.account.users.active.where.not(id: board.accesses.select(:user_id))
+      end
 
-        pattern = "%#{User.sanitize_sql_like(query.strip.downcase)}%"
-        board.account.users.active
-          .where.not(id: board.accesses.select(:user_id))
-          .joins(:identity)
-          .where("LOWER(users.name) LIKE :pattern OR LOWER(identities.email_address) LIKE :pattern", pattern:)
-          .alphabetically
-          .limit(SEARCH_LIMIT)
+      # shortcut: folds every addable user in Ruby (about 3,600 in prod, a few ms); move to a stored folded column if accounts reach tens of thousands.
+      # SQLite's LOWER() folds ASCII only and LIKE needs an ESCAPE clause, so the match is done here, as upstream's filterMatches did it in the browser.
+      def addable_to(board, query)
+        needle = fold(query)
+        return User.none if needle.empty?
+
+        ids = addable(board).joins(:identity).alphabetically.pluck(:id, :name, "identities.email_address")
+          .select { |_, name, email| fold(name).include?(needle) || fold(email).include?(needle) }
+          .first(SEARCH_LIMIT).map(&:first)
+        User.where(id: ids).alphabetically
+      end
+
+      def fold(text)
+        text.to_s.strip.downcase.unicode_normalize(:nfd).gsub(/[̀-ͯ]/, "")
       end
     end
   end

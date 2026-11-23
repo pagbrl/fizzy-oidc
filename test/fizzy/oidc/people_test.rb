@@ -28,12 +28,22 @@ class Fizzy::Oidc::PeopleTest < Minitest::Test
     assert_equal [ bob ], Fizzy::Oidc::People.addable_to(@general, "Bob@Example").to_a
   end
 
+  def test_the_search_ignores_accents_and_takes_like_wildcards_literally
+    elodie = person("Élodie Dupont", email: "jean_dupont@example.com")
+    person("Jean-Dupont", email: "jeanxdupont@example.com")
+    percent = person("100% Remote", email: "remote@example.com")
+
+    assert_equal [ elodie ], Fizzy::Oidc::People.addable_to(@general, "jean_dupont").to_a
+    assert_equal [ elodie ], Fizzy::Oidc::People.addable_to(@general, "elodie").to_a
+    assert_equal [ elodie ], Fizzy::Oidc::People.addable_to(@general, "ÉLODIE").to_a
+    assert_equal [ percent ], Fizzy::Oidc::People.addable_to(@general, "%").to_a
+  end
+
   def test_the_search_is_capped_and_needs_a_query
     25.times { |i| person("Member #{i}") }
 
     assert_equal Fizzy::Oidc::People::SEARCH_LIMIT, Fizzy::Oidc::People.addable_to(@general, "member").to_a.size
     assert_empty Fizzy::Oidc::People.addable_to(@general, " ").to_a
-    assert_empty Fizzy::Oidc::People.addable_to(@general, "%").to_a
   end
 
   private
