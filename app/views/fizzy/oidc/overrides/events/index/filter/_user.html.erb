@@ -21,7 +21,7 @@
           type: "search", autocorrect: "off", autocomplete: "off", data: { "1p-ignore": "true", filter_target: "input", dialog_target: "focusMouse", action: "input->filter#filter" } %>
 
     <ul class="popup__list" data-filter-target="list" role="listbox">
-      <% user_filtering.creator_choices.each do |user| %>
+      <% user_filtering.author_choices.each do |user| %>
         <%= tag.li class: "popup__item", data: {
               filter_target: "item", navigable_list_target: "item", multi_selection_combobox_target: "item", multi_selection_combobox_value: user.id, multi_selection_combobox_label: user.familiar_name },
               role: "checkbox", aria: { checked: filter.creators.include?(user) } do %>

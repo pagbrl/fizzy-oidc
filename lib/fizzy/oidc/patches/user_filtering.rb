@@ -21,6 +21,10 @@ module Fizzy
           @closer_choices ||= choices(People.closers_of(cards_in_scope), filter.closers)
         end
 
+        def author_choices
+          @author_choices ||= choices(People.authors_on(boards_in_scope), filter.creators)
+        end
+
         def users
           @users ||= assignee_choices.or(creator_choices).or(closer_choices)
         end
@@ -31,8 +35,12 @@ module Fizzy
         end
 
         private
+          def boards_in_scope
+            @boards_in_scope ||= (@board || filter.single_board)&.id || filter.boards.ids.presence || user.accesses.select(:board_id)
+          end
+
           def cards_in_scope
-            @cards_in_scope ||= Card.where(board_id: (@board || filter.single_board)&.id || user.accesses.select(:board_id))
+            @cards_in_scope ||= Card.where(board_id: boards_in_scope)
           end
 
           def choices(ids, selected)

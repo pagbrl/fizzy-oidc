@@ -17,6 +17,11 @@ module Fizzy
         Closure.where(card_id: cards.select(:id)).select(:user_id)
       end
 
+      # The Activity page filters its events by author, among these actions.
+      def authors_on(board_ids)
+        Event.where(board_id: board_ids, action: User::DayTimeline::TIMELINEABLE_ACTIONS).select(:creator_id)
+      end
+
       def addable(board)
         board.account.users.active.where.not(id: board.accesses.select(:user_id))
       end

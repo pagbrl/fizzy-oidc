@@ -2,7 +2,7 @@ require "test_helper"
 require "fizzy/oidc/patches/user_filtering"
 
 class Fizzy::Oidc::UserFilteringTest < Minitest::Test
-  Filter = Struct.new(:single_board, :assignees, :creators, :closers, keyword_init: true)
+  Filter = Struct.new(:single_board, :boards, :assignees, :creators, :closers, keyword_init: true)
 
   class Filtering
     attr_reader :user, :filter
@@ -32,7 +32,25 @@ class Fizzy::Oidc::UserFilteringTest < Minitest::Test
     infra_card = Card.create!(board: @infra, creator: @me)
     Assignment.create!(card: infra_card, assignee: @carol)
     Closure.create!(card: infra_card, user: @alice)
-    Card.create!(board: board("Elsewhere", @stranger), creator: @stranger)
+    elsewhere = board("Elsewhere", @stranger)
+    Card.create!(board: elsewhere, creator: @stranger)
+
+    Event.create!(board: @infra, creator: @carol, action: "comment_created")
+    Event.create!(board: @general, creator: @bob, action: "card_published")
+    Event.create!(board: @general, creator: @alice, action: "card_assigned")
+    Event.create!(board: elsewhere, creator: @stranger, action: "comment_created")
+  end
+
+  def test_the_activity_person_filter_offers_the_authors_of_timeline_events
+    assert_equal [ @bob, @carol ], Filtering.new(@me, filter).author_choices.to_a
+    assert_equal [ @bob, @stranger ], Filtering.new(@me, filter(single_board: @general, creators: [ @stranger ])).author_choices.to_a
+  end
+
+  def test_a_filter_on_several_boards_looks_at_those_boards_only
+    filtering = Filtering.new(@me, filter(boards: Board.where(id: @infra.id)))
+
+    assert_equal [ @carol ], filtering.assignee_choices.to_a
+    assert_equal [ @carol ], filtering.author_choices.to_a
   end
 
   def test_each_filter_offers_who_holds_its_role_on_my_boards
@@ -66,8 +84,8 @@ class Fizzy::Oidc::UserFilteringTest < Minitest::Test
   end
 
   private
-    def filter(single_board: nil, assignees: [], creators: [], closers: [])
-      Filter.new(single_board:, assignees:, creators:, closers:)
+    def filter(single_board: nil, boards: Board.none, assignees: [], creators: [], closers: [])
+      Filter.new(single_board:, boards:, assignees:, creators:, closers:)
     end
 
     def person(name, boards: [])

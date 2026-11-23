@@ -94,6 +94,13 @@ ActiveRecord::Schema.define do
     t.integer :user_id
     t.timestamps
   end
+
+  create_table :events do |t|
+    t.integer :board_id
+    t.integer :creator_id
+    t.string :action
+    t.timestamps
+  end
 end
 
 class Identity < ActiveRecord::Base
@@ -164,6 +171,15 @@ class Closure < ActiveRecord::Base
   belongs_to :user
 end
 
+class Event < ActiveRecord::Base
+  belongs_to :board
+  belongs_to :creator, class_name: "User"
+end
+
+class User::DayTimeline
+  TIMELINEABLE_ACTIONS = %w[ card_published comment_created ]
+end
+
 require "fizzy/oidc/version"
 require "fizzy/oidc/config"
 require "fizzy/oidc/claims"
@@ -185,7 +201,7 @@ end
 
 module TestHelpers
   def reset_db
-    [Closure, Assignment, Card, Access, Board, User, Account, Identity].each(&:delete_all)
+    [Event, Closure, Assignment, Card, Access, Board, User, Account, Identity].each(&:delete_all)
   end
 
   def reset_config
