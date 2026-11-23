@@ -14,15 +14,23 @@ We are pinned to Fizzy commit **`3068c2a7`** (Rails 8.x, Ruby 3.4.8). All monkey
 
 ## What gets monkey-patched
 
-All five of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_prepare`:
+All of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_prepare`:
 
-| Upstream controller | Actions overridden | Effect |
+| Upstream class | Methods overridden | Effect |
 |---|---|---|
 | `SessionsController` | `new`, `create`, `destroy` | `new` renders the sign-in button, `create` redirects to it, `destroy` ends the SSO session too |
 | `SignupsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::MagicLinksController` | `show`, `create` | Redirect to the sign-in page |
 | `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
+| `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
+| `User::Filtering` | `users` | A board page lists that board's active members; a cross-board page lists the active people who share a board with the viewer; people already picked in the filter stay listed |
+| `My::MenusController` | `show` | The menu's people are those who share a board with the viewer, same etag |
+| `BoardsController` | `show`, `edit` | `show` hands the board to the filter; `edit` lists the members plus a name/email search of at most 20 non-members (`Fizzy::Oidc::People`) |
+| `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
+| `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
+
+One view is overridden: `BoardsController.prepend_view_path` puts `app/views/fizzy/oidc/overrides` first, and that directory holds only `boards/edit/_users.html.erb`, a copy of upstream's partial. It renders every member as a checked toggle (upstream's `#update` revokes any member missing from `user_ids[]`) and only searched people unchecked; the search is a GET form in `content_for :footer`, outside the board's form, that the field joins with `form=` and that reloads the `board_access_search_results` frame. Re-diff it against upstream's partial when the pin moves.
 
 `SessionsController#destroy` ends Fizzy's session, then sends the browser to the IdP's `end_session_endpoint` (read from discovery) with the `id_token_hint` kept at login and a `post_logout_redirect_uri` back to the sign-in page. If discovery fails, it falls back to Fizzy's own local logout.
 
