@@ -47,7 +47,9 @@ begin
   app.cookies["session_token"] = jar[:session_token]
   edit_path = "#{account.slug}/boards/#{board.id}/edit"
   board_path = "#{account.slug}/boards/#{board.id}"
-  form_post = { "Content-Type" => "application/x-www-form-urlencoded" }
+  # Fizzy refuses a form post without the header a browser sends (production
+  # forgery protection by Sec-Fetch-Site).
+  form_post = { "Content-Type" => "application/x-www-form-urlencoded", "Sec-Fetch-Site" => "same-origin" }
   frame = form_post.merge("Turbo-Frame" => "board_access_search_results")
 
   app.get edit_path
