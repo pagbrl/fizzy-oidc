@@ -118,11 +118,11 @@ finds them by OIDC subject as before.
 | `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
 | `User::Filtering` | `users` | A board page lists that board's active members; a cross-board page lists the active people who share a board with the viewer; people already picked in the filter stay listed |
 | `My::MenusController` | `show` | The menu's people are those who share a board with the viewer, same etag |
-| `BoardsController` | `show`, `edit` | `show` hands the board to the filter; `edit` lists the members plus a name/email search of at most 20 non-members (`Fizzy::Oidc::People`) |
+| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` lists the members plus a search of at most 20 non-members, case and accents ignored; `update` runs that search when the Search button submitted the form, and saves nothing |
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
 
-The board access partial `boards/edit/_users.html.erb` is overridden from `app/views/fizzy/oidc/overrides`: it lists members plus a search instead of the whole account.
+The board access partial `boards/edit/_users.html.erb` is overridden from `app/views/fizzy/oidc/overrides`: it lists members plus a search instead of the whole account. `dev/board_access_smoke.rb` checks the round trip to `#update` in a real Fizzy.
 
 Logout ends Fizzy's session, then redirects to the IdP's `end_session_endpoint` (from OIDC discovery) with `id_token_hint` and a `post_logout_redirect_uri` pointing at Fizzy's sign-in page — register `https://<fizzy-host>/*` as a valid post-logout redirect URI on the IdP client. If discovery fails, logout stays local.
 

@@ -26,11 +26,11 @@ All of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_prepa
 | `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
 | `User::Filtering` | `users` | A board page lists that board's active members; a cross-board page lists the active people who share a board with the viewer; people already picked in the filter stay listed |
 | `My::MenusController` | `show` | The menu's people are those who share a board with the viewer, same etag |
-| `BoardsController` | `show`, `edit` | `show` hands the board to the filter; `edit` lists the members plus a name/email search of at most 20 non-members (`Fizzy::Oidc::People`) |
+| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` (a rewrite, not `super`) lists the members, the people ticked in an earlier search, and a name/email search of at most 20 non-members (`Fizzy::Oidc::People`, folded in Ruby: case and accents ignored, `%` and `_` literal); `update` renders the search instead of saving when the Search button submitted the form |
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
 
-One view is overridden: `BoardsController.prepend_view_path` puts `app/views/fizzy/oidc/overrides` first, and that directory holds only `boards/edit/_users.html.erb`, a copy of upstream's partial. It renders every member as a checked toggle (upstream's `#update` revokes any member missing from `user_ids[]`) and only searched people unchecked; the search is a GET form in `content_for :footer`, outside the board's form, that the field joins with `form=` and that reloads the `board_access_search_results` frame. Re-diff it against upstream's partial when the pin moves.
+One view is overridden: `BoardsController.prepend_view_path` puts `app/views/fizzy/oidc/overrides` first, and that directory holds only `boards/edit/_users.html.erb`, a copy of upstream's partial. It renders every member as a checked toggle, because upstream's `#update` revokes any member missing from `user_ids[]`. The search field, its Search button and the `board_access_search_results` frame sit inside the access menu under `toggler__visible-when-off`, so they hide when "Everyone" is on. The Search button belongs to the board's form (`name="search_people"`, `data-turbo-frame`), so a search posts the people already ticked and they come back ticked; Enter in the field clicks it through Fizzy's `clicker` controller, and a hidden submit button placed first keeps Enter elsewhere a save. Re-diff it against upstream's partial when the pin moves, then run `dev/board_access_smoke.rb`.
 
 `SessionsController#destroy` ends Fizzy's session, then sends the browser to the IdP's `end_session_endpoint` (read from discovery) with the `id_token_hint` kept at login and a `post_logout_redirect_uri` back to the sign-in page. If discovery fails, it falls back to Fizzy's own local logout.
 
@@ -112,8 +112,15 @@ Before bumping the pin:
    - `app/models/user.rb` and `app/models/user/role.rb` (enum values, owner semantics)
    - `app/models/account.rb` (`create_with_owner` signature)
    - `app/controllers/concerns/authentication.rb` (the `start_new_session_for` hook)
+   - `app/controllers/boards_controller.rb` (our `edit` is a copy, not `super`; `update` must still revoke members missing from `user_ids[]`)
+   - `app/views/boards/edit/_users.html.erb` (copied into `app/views/fizzy/oidc/overrides/boards/edit/`), `app/views/boards/_access_toggle.html.erb` and `app/helpers/accesses_helper.rb` (`access_menu_tag`, `access_toggles_for`), which the copy renders
+   - `app/models/user/filtering.rb` (`users`)
+   - `app/controllers/my/menus_controller.rb` (our `show` is a copy)
+   - `app/controllers/cards/assignments_controller.rb`
+   - `app/controllers/users/avatars_controller.rb` and `app/helpers/avatars_helper.rb`
 2. Run the test suite against the stub models.
 3. Smoke-test against a Fizzy checkout with the gem path-mounted: `docker compose -f compose.dev.yml up --build` (see the README's "Local stack" section).
+4. Mandatory: run the board access round trip in that Fizzy, `bin/rails runner /path/to/dev/board_access_smoke.rb`. It renders a board's edit page, checks every member comes back checked, searches twice, saves, and checks members kept and both searched people granted; it creates and deletes its own board and people. A member the override fails to render checked is a member the next save revokes, and no unit test sees that.
 
 ## Conventions
 
