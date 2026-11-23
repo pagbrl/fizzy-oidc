@@ -83,6 +83,16 @@ member is created verified, with the `member` role and no OIDC subject. On their
 first login the identity is found by email, linked to the subject, and the user
 keeps every board access granted in the meantime.
 
+To find one member by address, instead of paging through `GET /users`:
+
+```
+GET /:account_slug/oidc/users?email=alice@example.com
+Authorization: Bearer <same admin token>
+```
+
+`200` with the active member (same fields), `404` when the account has no
+active member with that address.
+
 To change a member's address — the IdP has already proven the new one, while
 Fizzy's own API only lets users change their own address behind a mail:
 

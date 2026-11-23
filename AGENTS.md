@@ -60,7 +60,7 @@ Key files:
 - `lib/fizzy/oidc/precreator.rb` — creates a member before their first login
 - `lib/fizzy/oidc/logout.rb` — the IdP end-session URL the patched `destroy` redirects to
 - `app/controllers/fizzy/oidc/callbacks_controller.rb` — OIDC + failure endpoints
-- `app/controllers/fizzy/oidc/users_controller.rb` — `POST /:account_slug/oidc/users` (the Precreator) and `PATCH /:account_slug/oidc/users/:id` (rewrite the identity's email), behind Fizzy's own bearer-token auth and `ensure_admin`
+- `app/controllers/fizzy/oidc/users_controller.rb` — `GET /:account_slug/oidc/users?email=` (one active member by address, 404 otherwise), `POST /:account_slug/oidc/users` (the Precreator) and `PATCH /:account_slug/oidc/users/:id` (rewrite the identity's email), behind Fizzy's own bearer-token auth and `ensure_admin`
 
 ## Non-obvious behaviors to preserve
 

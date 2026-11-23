@@ -3,6 +3,16 @@ module Fizzy
     class UsersController < ApplicationController
       before_action :ensure_admin
 
+      # One member by address: the outside system would otherwise page
+      # through every user of the account. Active members only, like
+      # Fizzy's own GET /users. Identity normalizes the address on lookup.
+      def lookup
+        identity = Identity.find_by(email_address: params.require(:email))
+        user = identity && Current.account.users.active.find_by(identity:)
+
+        user ? render(json: user_json(user)) : head(:not_found)
+      end
+
       def create
         user, created = Precreator.new(Current.account, email: params.require(:email_address), name: params[:name]).call
 
