@@ -76,6 +76,24 @@ ActiveRecord::Schema.define do
     t.string :involvement, default: "access_only"
     t.timestamps
   end
+
+  create_table :cards do |t|
+    t.integer :board_id
+    t.integer :creator_id
+    t.timestamps
+  end
+
+  create_table :assignments do |t|
+    t.integer :card_id
+    t.integer :assignee_id
+    t.timestamps
+  end
+
+  create_table :closures do |t|
+    t.integer :card_id
+    t.integer :user_id
+    t.timestamps
+  end
 end
 
 class Identity < ActiveRecord::Base
@@ -131,6 +149,21 @@ class Access < ActiveRecord::Base
   belongs_to :account
 end
 
+class Card < ActiveRecord::Base
+  belongs_to :board
+  belongs_to :creator, class_name: "User"
+end
+
+class Assignment < ActiveRecord::Base
+  belongs_to :card, touch: true
+  belongs_to :assignee, class_name: "User"
+end
+
+class Closure < ActiveRecord::Base
+  belongs_to :card, touch: true
+  belongs_to :user
+end
+
 require "fizzy/oidc/version"
 require "fizzy/oidc/config"
 require "fizzy/oidc/claims"
@@ -152,7 +185,7 @@ end
 
 module TestHelpers
   def reset_db
-    [Access, Board, User, Account, Identity].each(&:delete_all)
+    [Closure, Assignment, Card, Access, Board, User, Account, Identity].each(&:delete_all)
   end
 
   def reset_config

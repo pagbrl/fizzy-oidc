@@ -9,15 +9,6 @@ class Fizzy::Oidc::PeopleTest < Minitest::Test
     @infra = board("Infra", @me)
   end
 
-  def test_people_sharing_a_board_are_the_members_of_my_boards_once_each
-    alice = person("Alice", boards: [ @general, @infra ])
-    bob = person("Bob", boards: [ @general ])
-    person("Stranger", boards: [ board("Elsewhere", alice) ])
-    person("Gone", boards: [ @general ], active: false)
-
-    assert_equal [ alice, bob, @me ], Fizzy::Oidc::People.sharing_a_board_with(@me).alphabetically.to_a
-  end
-
   def test_the_search_finds_non_members_by_name_or_email_regardless_of_case
     person("Alice Martin", boards: [ @general ])
     bob = person("Bob Martin", email: "bob@example.com")

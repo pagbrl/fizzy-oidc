@@ -25,30 +25,44 @@ class Fizzy::Oidc::UserFilteringTest < Minitest::Test
     @me = person("Me")
     @general = board("General", @me)
     @infra = board("Infra", @me)
-    @alice = person("Alice", boards: [ @general ])
-    @bob = person("Bob", boards: [ @infra ])
-    @stranger = person("Stranger")
+    @alice, @bob, @carol, @stranger = %w[ Alice Bob Carol Stranger ].map { person(it, boards: [ @general, @infra ]) }
+
+    general_card = Card.create!(board: @general, creator: @alice)
+    Assignment.create!(card: general_card, assignee: @bob)
+    infra_card = Card.create!(board: @infra, creator: @me)
+    Assignment.create!(card: infra_card, assignee: @carol)
+    Closure.create!(card: infra_card, user: @alice)
+    Card.create!(board: board("Elsewhere", @stranger), creator: @stranger)
   end
 
-  def test_a_board_page_lists_its_members
+  def test_each_filter_offers_who_holds_its_role_on_my_boards
+    filtering = Filtering.new(@me, filter)
+
+    assert_equal [ @bob, @carol ], filtering.assignee_choices.to_a
+    assert_equal [ @alice, @me ], filtering.creator_choices.to_a
+    assert_equal [ @alice ], filtering.closer_choices.to_a
+  end
+
+  def test_a_board_page_offers_the_people_on_its_cards
     filtering = Filtering.new(@me, filter)
     filtering.board = @infra
 
-    assert_equal [ @bob, @me ], filtering.users.to_a
+    assert_equal [ @carol ], filtering.assignee_choices.to_a
+    assert_equal [ @me ], filtering.creator_choices.to_a
   end
 
-  def test_a_filter_on_one_board_lists_its_members
-    assert_equal [ @alice, @me ], Filtering.new(@me, filter(single_board: @general)).users.to_a
-  end
+  def test_a_filter_on_one_board_offers_the_people_on_its_cards
+    filtering = Filtering.new(@me, filter(single_board: @general))
 
-  def test_a_cross_board_page_lists_the_people_sharing_a_board
-    assert_equal [ @alice, @bob, @me ], Filtering.new(@me, filter).users.to_a
+    assert_equal [ @bob ], filtering.assignee_choices.to_a
+    assert_equal [], filtering.closer_choices.to_a
   end
 
   def test_people_already_picked_stay_listed
     filtering = Filtering.new(@me, filter(single_board: @general, assignees: [ @stranger ], closers: [ @bob ]))
 
-    assert_equal [ @alice, @bob, @me, @stranger ], filtering.users.to_a
+    assert_equal [ @bob, @stranger ], filtering.assignee_choices.to_a
+    assert_equal [ @bob ], filtering.closer_choices.to_a
   end
 
   private

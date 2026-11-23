@@ -5,8 +5,16 @@ module Fizzy
 
       module_function
 
-      def sharing_a_board_with(user)
-        user.account.users.active.where(id: Access.where(board_id: user.accesses.select(:board_id)).select(:user_id))
+      def assignees_of(cards)
+        Assignment.where(card_id: cards.select(:id)).select(:assignee_id)
+      end
+
+      def creators_of(cards)
+        cards.select(:creator_id)
+      end
+
+      def closers_of(cards)
+        Closure.where(card_id: cards.select(:id)).select(:user_id)
       end
 
       def addable(board)

@@ -80,7 +80,7 @@ module Fizzy
         User::Filtering.prepend(Fizzy::Oidc::Patches::UserFiltering)
         My::MenusController.prepend(Fizzy::Oidc::Patches::MenusController)
         BoardsController.prepend(Fizzy::Oidc::Patches::BoardsController)
-        BoardsController.prepend_view_path(Engine.root.join("app/views/fizzy/oidc/overrides"))
+        ApplicationController.prepend_view_path(Engine.root.join("app/views/fizzy/oidc/overrides"))
         AvatarsHelper.prepend(Fizzy::Oidc::Patches::AvatarsHelper)
         Users::AvatarsController.prepend(Fizzy::Oidc::Patches::AvatarsController)
       end
