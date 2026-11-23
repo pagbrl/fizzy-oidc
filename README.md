@@ -13,7 +13,7 @@ Single-tenant: the first OIDC user creates the account and becomes `owner`. Ever
 
 ## Compatibility
 
-Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches eleven Fizzy classes and one view; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
+Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches eleven Fizzy classes and overrides five views; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
 
 ## Install into Fizzy
 
@@ -116,8 +116,8 @@ finds them by OIDC subject as before.
 | `Signups::CompletionsController` | `new`, `create` | Redirect to the sign-in page |
 | `Sessions::PasskeysController` | `create` | Redirect to the sign-in page |
 | `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
-| `User::Filtering` | `users` | A board page lists that board's active members; a cross-board page lists the active people who share a board with the viewer; people already picked in the filter stay listed |
-| `My::MenusController` | `show` | The menu's people are those who share a board with the viewer, same etag |
+| `User::Filtering` | `users`, `cache_key`, plus `assignee_choices`, `creator_choices`, `closer_choices` | Each person filter offers the active people who hold its role on a card in scope ("assigned to": assignees, "added by" and Activity's person filter: creators, "closed by": closers), one SQL subquery each; the scope is the board on a board page, the viewer's boards elsewhere; people already picked stay listed; the cache key adds the cards in scope |
+| `My::MenusController` | `show` | The menu's people are the active assignees and creators of cards on the viewer's boards; the etag adds those cards (their count and latest `updated_at`: a new card or an assignment, which touches its card, changes it) |
 | `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` lists the members plus a search of at most 20 non-members, case and accents ignored; `update` runs that search when the Search button submitted the form, and saves nothing |
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
