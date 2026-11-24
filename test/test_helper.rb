@@ -148,6 +148,10 @@ class User < ActiveRecord::Base
   end
 end
 
+class Current < ActiveSupport::CurrentAttributes
+  attribute :account, :user
+end
+
 class Board < ActiveRecord::Base
   belongs_to :account
   has_many :accesses, dependent: :destroy
@@ -249,6 +253,7 @@ class Minitest::Test
   include TestHelpers
 
   def setup
+    Current.reset
     reset_db
     clear_mapping
     ENV["FIZZY_OIDC_ISSUER"]        = "https://id.test"

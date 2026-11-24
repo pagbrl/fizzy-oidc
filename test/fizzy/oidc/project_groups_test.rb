@@ -193,19 +193,36 @@ class Fizzy::Oidc::ProjectGroupsTest < Minitest::Test
 
   def test_a_search_finds_groups_not_yet_attached_by_name
     %w[ Alpha Alphonse Beta ].each { |name| Group.create!(account: @account, name: "Projet #{name}") }
+    join owner, "Projet Alpha", "Projet Alphonse", "Projet Beta"
     attach "Projet Alpha"
 
-    assert_equal [ "Projet Alphonse" ], ProjectGroups.addable_to(@board, "alph").pluck(:name)
+    assert_equal [ "Projet Alphonse" ], ProjectGroups.addable_to(@board, owner, "alph").pluck(:name)
   end
 
   # Without a query the page still offers groups: a board's own project group
   # first, as it is the one its admins come for.
   def test_without_a_query_the_groups_are_offered_the_boards_namesake_first
     %w[ Alpha Beta Gamma ].each { |name| Group.create!(account: @account, name: "Projet #{name}") }
+    join owner, "Projet Alpha", "Projet Beta", "Projet Gamma"
     @board.update!(name: "Projet Gamma")
     attach "Projet Alpha"
 
-    assert_equal [ "Projet Gamma", "Projet Beta" ], ProjectGroups.addable_to(@board, " ").pluck(:name)
+    assert_equal [ "Projet Gamma", "Projet Beta" ], ProjectGroups.addable_to(@board, owner, " ").pluck(:name)
+  end
+
+  # A group is private to its members, the account's owner included.
+  def test_only_the_groups_one_is_in_are_offered_and_kept_when_ticked
+    %w[ Alpha Beta Gamma ].each { |name| Group.create!(account: @account, name: "Projet #{name}") }
+    join owner, "Projet Beta"
+    @board.update!(name: "Projet Gamma")
+    attach "Projet Alpha"
+    alpha, beta, gamma = Group.order(:name).to_a
+
+    assert_equal [ "Projet Beta" ], ProjectGroups.addable_to(@board, owner, " ").pluck(:name)
+    assert_empty ProjectGroups.addable_to(@board, owner, "gamma")
+    assert_equal [ alpha.id ], ProjectGroups.locked_for(@board, owner).ids
+    assert_equal [ alpha.id, beta.id ].sort, ProjectGroups.kept_on(@board, owner, [ beta.id, gamma.id ]).sort
+    assert_equal [ alpha.id ], ProjectGroups.kept_on(@board, owner, [ "" ])
   end
 
   private
@@ -216,6 +233,10 @@ class Fizzy::Oidc::ProjectGroupsTest < Minitest::Test
 
     def owner
       @account.users.find_by!(role: "owner")
+    end
+
+    def join(user, *names)
+      Group.where(account: @account, name: names).each { Fizzy::Oidc::GroupMembership.create!(group: it, user:) }
     end
 
     def attach(*names)

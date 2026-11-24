@@ -57,13 +57,30 @@ module Fizzy
         GroupGrant.where(board_id: board.id, user_id: user_ids).delete_all
       end
 
-      def addable(board)
-        Group.where(account_id: board.account_id).where.not(id: attached_to(board).select(:id))
+      # A group is private: only its members see it offered, attach it or
+      # detach it, the account's owner and admins included.
+      def addable(board, user)
+        Group.where(account_id: board.account_id, id: group_ids_of(user)).where.not(id: attached_to(board).select(:id))
       end
 
-      def addable_to(board, query)
+      # Attached groups the user is not in: shown, but they cannot detach them.
+      def locked_for(board, user)
+        attached_to(board).where.not(id: group_ids_of(user))
+      end
+
+      # The groups a save by this user leaves attached: what they ticked among
+      # their own groups, and every attached group they are not in.
+      def kept_on(board, user, group_ids)
+        Group.where(id: group_ids).where(id: group_ids_of(user)).pluck(:id) + locked_for(board, user).pluck(:id)
+      end
+
+      def group_ids_of(user)
+        GroupMembership.where(user_id: user.id).select(:group_id)
+      end
+
+      def addable_to(board, user, query)
         needle = People.fold(query)
-        groups = addable(board).order(:name).pluck(:id, :name)
+        groups = addable(board, user).order(:name).pluck(:id, :name)
         groups = needle.empty? ? groups.sort_by { |_, name| People.fold(name) == People.fold(board.name) ? 0 : 1 } : groups.select { |_, name| People.fold(name).include?(needle) }
         groups = groups.first(SEARCH_LIMIT)
         # By name: in_order_of casts the binary UUID ids wrong on MySQL and matches nothing.
