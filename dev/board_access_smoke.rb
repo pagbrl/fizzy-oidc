@@ -1,7 +1,8 @@
 # Round trip through the overridden boards/edit/_users partial and the real
 # BoardsController#update: a member the page fails to render checked is a
 # member the next save revokes. Then a project group: attached, its member
-# locked on and kept by a save, detached. Run inside a Fizzy that loads the gem:
+# locked on and kept by a save, locked for the owner once they leave it, then
+# detached. Run inside a Fizzy that loads the gem:
 #
 #   bin/rails runner /path/to/dev/board_access_smoke.rb
 #
@@ -39,6 +40,8 @@ kept, searched, grouped = people[0, 2], people[2, 2], people[4]
 group_name = "Projet Smoke #{stamp}"
 Fizzy::Oidc::ProjectGroups.sync_member(grouped, [ "/#{group_name}" ])
 group = Fizzy::Oidc::Group.find_by!(account:, name: group_name)
+# A group is offered only to its members, the owner included.
+Fizzy::Oidc::GroupMembership.create!(group:, user: owner)
 board = Current.set(account:, user: owner) { account.boards.create!(name: "Board access smoke #{stamp}", creator: owner, all_access: false) }
 board.accesses.grant_to kept
 
@@ -99,6 +102,14 @@ begin
 
   app.post board_path, params: fields(form), headers: form_post
   check "a save without the locked member keeps them", members + [ grouped.id ], board.reload.users.ids
+
+  Fizzy::Oidc::GroupMembership.where(group:, user: owner).delete_all
+  app.get edit_path
+  form = board_form(app.response.body)
+  check "a group the owner is not in is rendered locked", [ group.id ], form.css('input[name="group_ids[]"][checked][disabled]').map { it["value"] }
+  app.post board_path, params: fields(form), headers: form_post
+  check "a save cannot detach it", [ group.id ], Fizzy::Oidc::BoardGroup.where(board_id: board.id).pluck(:group_id)
+  Fizzy::Oidc::GroupMembership.create!(group:, user: owner)
 
   app.get edit_path
   form = board_form(app.response.body)
