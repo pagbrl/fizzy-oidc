@@ -38,6 +38,7 @@
 
   <ul class="settings__scrollable-list" data-filter-target="list">
     <%= access_toggles_for selected_users, selected: true, disabled: %>
+    <%= render partial: "fizzy/oidc/boards/group_member_toggle", collection: @group_users, as: :user, locals: { granted_through: @granted_through } %>
   </ul>
 
   <%# The search button belongs to the board's form, so a search carries the people already ticked. Enter in the field clicks it rather than Save. %>
@@ -62,4 +63,37 @@
       <% end %>
     </div>
   <% end %>
+
+  <%# Project groups from the IdP: every member of a ticked group gets access, and loses it when the group is unticked. %>
+  <div class="toggler__visible-when-off">
+    <h3 class="divider txt-small margin-block-start">Groups</h3>
+
+    <%# Always sent, so unticking the last group still reaches #update. %>
+    <input type="hidden" name="group_ids[]" value="">
+    <ul class="settings__scrollable-list">
+      <%= render partial: "fizzy/oidc/boards/group_toggle", collection: @board_groups, as: :group, locals: { selected: true, disabled: } %>
+    </ul>
+
+    <% unless disabled %>
+      <div data-controller="clicker">
+        <div class="flex align-center gap-half margin-block-start">
+          <%= search_field_tag :group_q, params[:group_q], placeholder: "Find a group to add…", class: "input full-width txt-small",
+                autocorrect: "off", autocomplete: "off", aria: { label: "Find a group to add by name" },
+                data: { "1p-ignore": "true", action: "keydown.enter->clicker#click:stop:prevent" } %>
+          <%= button_tag "Search", type: "submit", name: "search_groups", value: "1", class: "btn txt-small",
+                data: { clicker_target: "clickable", turbo_frame: "board_group_search_results" } %>
+        </div>
+
+        <%= turbo_frame_tag "board_group_search_results" do %>
+          <ul class="settings__scrollable-list margin-block-start">
+            <%= render partial: "fizzy/oidc/boards/group_toggle", collection: @ticked_groups, as: :group, locals: { selected: true, disabled: false } %>
+            <%= render partial: "fizzy/oidc/boards/group_toggle", collection: @unselected_groups, as: :group, locals: { selected: false, disabled: false } %>
+          </ul>
+          <% if params[:group_q].present? && @unselected_groups.none? %>
+            <p class="txt-small txt-subtle">No other group matches “<%= params[:group_q] %>”.</p>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
 <% end %>

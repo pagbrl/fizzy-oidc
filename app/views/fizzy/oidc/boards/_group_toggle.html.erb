@@ -1,0 +1,17 @@
+<li class="flex align-center gap-half">
+  <figure class="avatar fill-selected">
+    <%= icon_tag "everyone" %>
+  </figure>
+
+  <div class="min-width">
+    <div class="overflow-ellipsis"><strong><%= group.name %></strong></div>
+  </div>
+
+  <hr class="separator--horizontal flex-item-grow" style="--border-color: var(--color-ink-medium); --border-style: dashed" aria-hidden="true">
+
+  <label class="switch flex-item-no-shrink">
+    <%= check_box_tag "group_ids[]", group.id, selected, class: "switch__input", id: nil, disabled: %>
+    <span class="switch__btn round"></span>
+    <span class="for-screen-reader">Give the members of <%= group.name %> access</span>
+  </label>
+</li>
