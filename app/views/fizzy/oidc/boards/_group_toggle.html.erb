@@ -5,6 +5,9 @@
 
   <div class="min-width">
     <div class="overflow-ellipsis"><strong><%= group.name %></strong></div>
+    <% if local_assigns[:locked] %>
+      <div class="txt-x-small txt-subtle">Only its members can remove it</div>
+    <% end %>
   </div>
 
   <hr class="separator--horizontal flex-item-grow" style="--border-color: var(--color-ink-medium); --border-style: dashed" aria-hidden="true">

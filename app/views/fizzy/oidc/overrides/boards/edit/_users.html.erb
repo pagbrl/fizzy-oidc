@@ -71,7 +71,10 @@
     <%# Always sent, so unticking the last group still reaches #update. %>
     <input type="hidden" name="group_ids[]" value="">
     <ul class="settings__scrollable-list">
-      <%= render partial: "fizzy/oidc/boards/group_toggle", collection: @board_groups, as: :group, locals: { selected: true, disabled: } %>
+      <%# A group is private to its members: whoever is not in an attached group sees it, locked. Disabled, it is not submitted, and #update keeps it. %>
+      <% @board_groups.each do |group| %>
+        <%= render "fizzy/oidc/boards/group_toggle", group:, selected: true, disabled: disabled || @locked_group_ids.include?(group.id), locked: @locked_group_ids.include?(group.id) %>
+      <% end %>
     </ul>
 
     <% unless disabled %>
