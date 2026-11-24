@@ -30,7 +30,7 @@ module Fizzy
         # On the page, a member only a group lets in is locked: unticking
         # them would last until their next login. Through the API, user_ids
         # wins, as the community manager knows memberships fresher than the
-        # last login.
+        # last login; personal_user_ids makes those accesses in person.
         # Groups change after upstream's save, which would otherwise revoke the
         # members a newly attached group just let in.
         def update
@@ -44,6 +44,7 @@ module Fizzy
 
             @board.class.transaction do
               super
+              ProjectGroups.claim_in_person(@board, Array(params[:personal_user_ids])) if params.key?(:personal_user_ids)
               ProjectGroups.attach(@board, Array(params[:group_ids]).compact_blank) if params.key?(:group_ids)
             end
           end

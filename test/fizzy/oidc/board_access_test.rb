@@ -112,6 +112,26 @@ class Fizzy::Oidc::BoardAccessTest < Minitest::Test
     assert_empty Fizzy::Oidc::GroupGrant.where(board_id: @board.id)
   end
 
+  def test_a_json_save_makes_the_personal_user_ids_accesses_in_person
+    dan = in_alpha("Dan")
+    eve = in_alpha("Eve")
+
+    update_json(user_ids: [ @alice.id, @bob.id, dan.id, eve.id ], personal_user_ids: [ dan.id.to_s, @carol.id.to_s ])
+
+    assert_equal [ eve.id ], Fizzy::Oidc::GroupGrant.where(board_id: @board.id).pluck(:user_id)
+    refute_includes @board.reload.users, @carol
+  end
+
+  def test_an_access_claimed_in_person_survives_leaving_the_group_at_login
+    dan = in_alpha("Dan")
+    update_json(user_ids: [ @alice.id, @bob.id, dan.id ], personal_user_ids: [ dan.id ])
+
+    auth = build_auth(sub: "dan", email: dan.identity.email_address, name: "Dan", groups: [])
+    Fizzy::Oidc::Provisioner.new(Fizzy::Oidc::Claims.from_omniauth(auth)).call
+
+    assert_includes @board.reload.users, dan
+  end
+
   def test_a_save_without_group_ids_leaves_the_groups_alone
     Fizzy::Oidc::ProjectGroups.attach(@board, [ alpha.id ])
 

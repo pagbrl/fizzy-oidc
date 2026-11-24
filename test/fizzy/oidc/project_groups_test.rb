@@ -134,6 +134,15 @@ class Fizzy::Oidc::ProjectGroupsTest < Minitest::Test
     assert_empty granted_user_ids
   end
 
+  def test_group_user_ids_are_the_members_only_a_group_lets_in
+    alice = log_in "alice", [ "Projet Alpha" ]
+    bob = log_in "bob", [ "Projet Alpha" ]
+    Access.create!(user: bob, board: @board, account: @account)
+    attach "Projet Alpha"
+
+    assert_equal [ alice.id ], ProjectGroups.group_user_ids(@board)
+  end
+
   def test_a_deactivated_member_is_not_granted
     alice = log_in "alice", [ "Projet Alpha" ]
     alice.update!(active: false)

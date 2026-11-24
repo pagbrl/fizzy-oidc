@@ -48,6 +48,15 @@ module Fizzy
           .group_by(&:first).transform_values { it.map(&:last) }
       end
 
+      def group_user_ids(board)
+        GroupGrant.where(board_id: board.id, user_id: board.accesses.select(:user_id)).pluck(:user_id)
+      end
+
+      # The access stays, and no group takes it back any more.
+      def claim_in_person(board, user_ids)
+        GroupGrant.where(board_id: board.id, user_id: user_ids).delete_all
+      end
+
       def addable(board)
         Group.where(account_id: board.account_id).where.not(id: attached_to(board).select(:id))
       end
