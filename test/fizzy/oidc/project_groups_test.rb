@@ -108,6 +108,32 @@ class Fizzy::Oidc::ProjectGroupsTest < Minitest::Test
     assert_includes board_users, alice
   end
 
+  def test_a_group_leaving_an_all_access_board_leaves_its_accesses_in_person
+    alice = log_in "alice", [ "Projet Alpha" ]
+    attach "Projet Alpha"
+    @board.update!(all_access: true)
+
+    attach
+    @board.update!(all_access: false)
+    log_in "alice", []
+
+    assert_includes board_users, alice
+    assert_empty granted_user_ids
+  end
+
+  def test_a_member_leaving_the_group_of_an_all_access_board_keeps_the_access_in_person
+    alice = log_in "alice", [ "Projet Alpha" ]
+    attach "Projet Alpha"
+    @board.update!(all_access: true)
+
+    log_in "alice", []
+    @board.update!(all_access: false)
+    attach
+
+    assert_includes board_users, alice
+    assert_empty granted_user_ids
+  end
+
   def test_a_deactivated_member_is_not_granted
     alice = log_in "alice", [ "Projet Alpha" ]
     alice.update!(active: false)

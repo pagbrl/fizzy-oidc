@@ -72,11 +72,13 @@ module Fizzy
         end
       end
 
-      # Fizzy never revokes on an all-access board either (Board::Accessible#revoke_from).
+      # Fizzy never revokes on an all-access board (Board::Accessible#revoke_from):
+      # there the access stays, and the grant goes, so it is in person from now on.
       def revoke(grants)
-        grants = grants.where.not(board_id: Board.where(all_access: true).select(:id)).to_a
-        grants.each { Access.where(board_id: it.board_id, user_id: it.user_id).destroy_all }
-        GroupGrant.where(id: grants.map(&:id)).delete_all
+        grants.where(board_id: Board.where(all_access: false).select(:id)).each do |grant|
+          Access.where(board_id: grant.board_id, user_id: grant.user_id).destroy_all
+        end
+        grants.delete_all
       end
     end
   end
