@@ -26,7 +26,8 @@ All of these are prepended in `lib/fizzy/oidc/engine.rb` inside `config.to_prepa
 | `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
 | `User::Filtering` | `users`, `cache_key`, plus `assignee_choices`, `creator_choices`, `closer_choices`, `author_choices` | Each person filter offers the active people who hold its role on a card in scope ("assigned to": assignees, "added by": creators, "closed by": closers; Activity's person filter, which filters events by author: the authors of timeline events), one SQL subquery each (the authors one is about 8 ms on 30,000 events, through the board and action index); the scope is the board on a board page, the boards picked in the filter, else the viewer's boards; people already picked stay listed; the cache key adds the cards in scope |
 | `My::MenusController` | `show` | The menu's people are the active assignees and creators of cards on the viewer's boards; the etag adds those cards (their count and latest `updated_at`: a new card or an assignment, which touches its card, changes it) |
-| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` (a rewrite, not `super`) lists the members, the people ticked in an earlier search, and a name/email search of at most 20 non-members (`Fizzy::Oidc::People`, folded in Ruby: case and accents ignored, `%` and `_` literal); `update` renders the search instead of saving when the Search button submitted the form |
+| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` (a rewrite, not `super`) lists the members, the people ticked in an earlier search, and a name/email search of at most 20 non-members (`Fizzy::Oidc::People`, folded in Ruby: case and accents ignored, `%` and `_` literal), then the same for project groups (`Fizzy::Oidc::ProjectGroups`); `update` renders a search instead of saving when a Search button submitted the form; a save adds the members only a group lets in to `user_ids[]`, calls `super`, then attaches the ticked groups (after, or upstream's revise would revoke whom a new group just let in) |
+| `Access`, `Board`, `User` | `after_destroy` (included concerns) | Drop the gem's rows: an access's group grant, a board's attached groups and grants (Fizzy deletes its accesses without callbacks), a user's memberships |
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
 
@@ -46,7 +47,8 @@ request  → omniauth_openid_connect middleware (mounted at /auth)
                    ├── find_or_bootstrap Account  (first ever user → owner)
                    ├── find_or_create User
                    ├── reconcile_role (owner never demoted)
-                   └── reconcile_accesses (additive + revocation within managed set)
+                   ├── reconcile_accesses (additive + revocation within managed set)
+                   └── ProjectGroups.sync_member (claim's project groups → memberships → group grants)
               → start_new_session_for(identity)
               → redirect into account landing
 ```
@@ -58,6 +60,7 @@ Key files:
 - `lib/fizzy/oidc/claims.rb` — OmniAuth hash → normalized claims
 - `lib/fizzy/oidc/provisioner.rb` — the only place that writes to Fizzy's models
 - `lib/fizzy/oidc/precreator.rb` — creates a member before their first login
+- `lib/fizzy/oidc/project_groups.rb` — project groups: memberships at login, attach/detach on a board, the grants they make; models in `app/models/fizzy/oidc/`, group toggles in `app/views/fizzy/oidc/boards/`
 - `lib/fizzy/oidc/logout.rb` — the IdP end-session URL the patched `destroy` redirects to
 - `app/controllers/fizzy/oidc/callbacks_controller.rb` — OIDC + failure endpoints
 - `app/controllers/fizzy/oidc/users_controller.rb` — `GET /:account_slug/oidc/users?email=` (one active member by address, 404 otherwise), `POST /:account_slug/oidc/users` (the Precreator) and `PATCH /:account_slug/oidc/users/:id` (rewrite the identity's email), behind Fizzy's own bearer-token auth and `ensure_admin`
@@ -73,6 +76,7 @@ Key files:
 - **Every page widens `form-action` to the issuer's origin.** Fizzy's CSP says `form-action 'self'` and browsers enforce it on the redirects after a form POST, so without it the sign-in button's POST stops before reaching the IdP, and so does the sign-out button in the menu of every page. `ApplicationController` gets it (`engine.rb`).
 - **The ID token is kept on Fizzy's session** (`sessions.oidc_id_token`, set in the callback) so logout can send it as `id_token_hint` and skip the IdP's "log out?" screen. A session opened before the column existed has none: its logout sends `client_id` instead and the IdP asks once.
 - **Pre-created members are linked by email on first login.** `Precreator` makes an identity with no OIDC subject; the Provisioner's email fallback is what attaches the subject to it. Removing that fallback strands every pre-created member.
+- **A group only takes back what it gave.** `oidc_group_grants` records the accesses a project group created; an access that existed before is never recorded and never revoked by group logic. Revocation skips `all_access` boards, as `Board::Accessible#revoke_from` does. A member only a group lets in is locked on the access page and re-added to `user_ids[]` by `update`, because the next login would re-grant anyway. Do not attach a group to a board the YAML mapping manages: config reconciliation revokes any access there it does not grant, the group's too. It runs first at login, so the group grants back in the same login, but a member leaving the group loses a board the mapping also grants until their next login.
 - **Boards are matched by `name` within the account.** Missing boards are logged and skipped — the provisioner does not auto-create boards.
 
 ## Running tests
@@ -113,6 +117,7 @@ Before bumping the pin:
    - `app/models/account.rb` (`create_with_owner` signature)
    - `app/controllers/concerns/authentication.rb` (the `start_new_session_for` hook)
    - `app/controllers/boards_controller.rb` (our `edit` is a copy, not `super`; `update` must still revoke members missing from `user_ids[]`)
+   - `app/models/board/accessible.rb` (`revoke_from` skips `all_access`, `has_many :accesses, dependent: :delete_all`), `app/models/access.rb` and `User#deactivate` (accesses destroyed with callbacks), which the group cleanup relies on
    - `app/views/boards/edit/_users.html.erb` (copied into `app/views/fizzy/oidc/overrides/boards/edit/`), `app/views/boards/_access_toggle.html.erb` and `app/helpers/accesses_helper.rb` (`access_menu_tag`, `access_toggles_for`), which the copy renders
    - `app/models/user/filtering.rb` (`users`, `cache_key`), and `app/views/filters/settings/_assignees.html.erb`, `_creators.html.erb`, `_closers.html.erb` and `app/views/events/index/filter/_user.html.erb` (copied into `app/views/fizzy/oidc/overrides/`); `app/models/user/day_timeline.rb` (`TIMELINEABLE_ACTIONS`, and the events still filtered by `creator_id`); `Assignment`, `Closure` and `Card` must still store `assignee_id`, `user_id` and `creator_id`, and assignments must still `touch` their card or the menu etag goes stale
    - `app/controllers/my/menus_controller.rb` (our `show` is a copy)
@@ -120,7 +125,7 @@ Before bumping the pin:
    - `app/controllers/users/avatars_controller.rb` and `app/helpers/avatars_helper.rb`
 2. Run the test suite against the stub models.
 3. Smoke-test against a Fizzy checkout with the gem path-mounted: `docker compose -f compose.dev.yml up --build` (see the README's "Local stack" section).
-4. Mandatory: run the board access round trip in that Fizzy, `bin/rails runner /path/to/dev/board_access_smoke.rb`. It renders a board's edit page, checks every member comes back checked, searches twice, saves, and checks members kept and both searched people granted; it creates and deletes its own board and people. A member the override fails to render checked is a member the next save revokes, and no unit test sees that.
+4. Mandatory: run the board access round trip in that Fizzy, `bin/rails runner /path/to/dev/board_access_smoke.rb`. It renders a board's edit page, checks every member comes back checked, searches twice, saves, and checks members kept and both searched people granted; then searches and attaches a project group, checks its member is let in and rendered locked, saves without them, and detaches the group; it creates and deletes its own board, people and group. A member the override fails to render checked is a member the next save revokes, and no unit test sees that.
 
 ## Conventions
 

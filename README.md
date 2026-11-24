@@ -8,12 +8,13 @@ This is a Rails engine gem that:
 - Provisions users just-in-time on first login.
 - Maps IdP groups to Fizzy boards via a YAML config, reconciled on every login.
 - Maps a configurable "admin group" claim to Fizzy's `admin` role.
+- Lets a board's admins open it to an IdP project group ("Projet X"), whose members come from the groups claim at login.
 
 Single-tenant: the first OIDC user creates the account and becomes `owner`. Every subsequent user is added to that same account.
 
 ## Compatibility
 
-Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches eleven Fizzy classes and overrides five views; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
+Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches fourteen Fizzy classes and overrides five views; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
 
 ## Install into Fizzy
 
@@ -61,6 +62,7 @@ mappings:
 - `admin_group`: users with this group claim get the `admin` role (the first user is always `owner`).
 - `default_boards`: every logged-in user gets access to these.
 - `groups`: per-group board grants. Boards are matched by name within the account. Missing boards are logged and skipped (not created).
+- `project_group_pattern` (optional): a regular expression for the groups boards can be opened to. Default `\AProjet .+(?<! Admin)\z`: `Projet X`, not its admin tier `Projet X Admin`.
 
 Boards marked `all_access: true` are granted automatically by Fizzy on user creation and are left untouched by this plugin. Only boards listed in the mapping are reconciled (added when earned, revoked when the user no longer has the group).
 
@@ -114,7 +116,16 @@ finds them by OIDC subject as before.
 4. Finds or creates the `User` in that account linked to the identity.
 5. Updates the user's role: `owner` is never downgraded; otherwise `admin` if in `admin_group`, else `member`.
 6. Reconciles `Access` records against the mapping (additive for earned groups, destructive for revoked groups within the managed set).
+7. Sets the user's project groups to the ones in the claim (a leading `/` is dropped), creating a group the first time it is seen, and the accesses those groups give follow (see below).
 7. Starts a Fizzy session and redirects into the app.
+
+## Project groups on boards
+
+Whoever can change a board's access can also tick project groups on the same page, under "Groups", with a search by name like the one for people. Ticking a group gives every member access; unticking it takes back the accesses the group gave, unless another ticked group still covers the person. A member who leaves the project loses them at their next login.
+
+An access a person had before a group gave it is theirs: no group ever takes it back. Accesses a group gave are recorded (`oidc_group_grants`), and only those are revoked. A member whose access only a group gives is listed with "via Projet X" and cannot be unticked on their own, from the page or the API (`user_ids[]`): the next login would give it back. On an `all_access` board nothing is revoked, as in Fizzy.
+
+Membership is the claim at login: someone who never logged in is in no group. The gem's four tables (`oidc_groups`, `oidc_group_memberships`, `oidc_board_groups`, `oidc_group_grants`) are created like the OIDC columns, by `Schema.ensure!` and a migration.
 
 ## What it monkey-patches
 
@@ -128,7 +139,8 @@ finds them by OIDC subject as before.
 | `Cards::AssignmentsController` | `new` | Loads the card's assignees once, so the picker's checkmarks cost no query per board member |
 | `User::Filtering` | `users`, `cache_key`, plus `assignee_choices`, `creator_choices`, `closer_choices`, `author_choices` | Each person filter offers the active people who hold its role on a card in scope ("assigned to": assignees, "added by": creators, "closed by": closers; Activity's person filter, which filters events by author: the authors of timeline events), one SQL subquery each (the authors one is about 8 ms on 30,000 events, through the board and action index); the scope is the board on a board page, the boards picked in the filter, else the viewer's boards; people already picked stay listed; the cache key adds the cards in scope |
 | `My::MenusController` | `show` | The menu's people are the active assignees and creators of cards on the viewer's boards; the etag adds those cards (their count and latest `updated_at`: a new card or an assignment, which touches its card, changes it) |
-| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` lists the members plus a search of at most 20 non-members, case and accents ignored; `update` runs that search when the Search button submitted the form, and saves nothing |
+| `BoardsController` | `show`, `edit`, `update` | `show` hands the board to the filter; `edit` lists the members plus a search of at most 20 non-members, case and accents ignored, and the same for project groups; `update` runs a search when a Search button submitted the form, and saves nothing; a save keeps the members only a group lets in, then attaches the ticked groups |
+| `Access`, `Board`, `User` | `after_destroy` | Drop the gem's group rows of what is gone; a removed access is no longer recorded as a group's |
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
 
@@ -213,6 +225,7 @@ Coverage:
 - `test/fizzy/oidc/claims_test.rb` — OmniAuth hash parsing, configurable groups claim, missing-claim validation.
 - `test/fizzy/oidc/config_test.rb` — ENV + YAML loading, `group_boards` / `all_group_boards` / `admin_group` / `default_boards`.
 - `test/fizzy/oidc/logout_test.rb` — end-session URL with `id_token_hint`, `client_id` fallback, local logout when the IdP has no end-session endpoint or discovery fails.
+- `test/fizzy/oidc/project_groups_test.rb` — project groups: memberships from the claim, grants on attach, revocation on detach and on leaving, in-person access untouched, cleanup.
 - `test/fizzy/oidc/provisioner_test.rb` — full reconciliation matrix: first-login bootstrap, role promotion/demotion, owner protection, board grants and revocations, `all_access` untouched, unknown boards skipped, email-fallback identity migration.
 
 ## Not included (yet)
