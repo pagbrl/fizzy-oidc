@@ -103,6 +103,10 @@ ActiveRecord::Schema.define do
   end
 end
 
+class ApplicationRecord < ActiveRecord::Base
+  self.abstract_class = true
+end
+
 class Identity < ActiveRecord::Base
   has_many :users, dependent: :nullify
 end
@@ -188,6 +192,16 @@ require "fizzy/oidc/precreator"
 require "fizzy/oidc/schema"
 require "fizzy/oidc/logout"
 require "fizzy/oidc/people"
+require "fizzy/oidc/project_groups"
+require "fizzy/oidc/patches/access"
+require "fizzy/oidc/patches/board"
+require "fizzy/oidc/patches/user"
+%w[ group group_membership board_group group_grant ].each { require_relative "../app/models/fizzy/oidc/#{it}" }
+
+Fizzy::Oidc::Schema.ensure!
+Access.include(Fizzy::Oidc::Patches::Access)
+Board.include(Fizzy::Oidc::Patches::Board)
+User.include(Fizzy::Oidc::Patches::User)
 
 module Fizzy::Oidc
   class Error < StandardError; end
@@ -201,7 +215,8 @@ end
 
 module TestHelpers
   def reset_db
-    [Event, Closure, Assignment, Card, Access, Board, User, Account, Identity].each(&:delete_all)
+    [Event, Closure, Assignment, Card, Access, Board, User, Account, Identity,
+     Fizzy::Oidc::GroupGrant, Fizzy::Oidc::BoardGroup, Fizzy::Oidc::GroupMembership, Fizzy::Oidc::Group].each(&:delete_all)
   end
 
   def reset_config

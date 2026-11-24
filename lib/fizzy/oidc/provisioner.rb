@@ -14,6 +14,7 @@ module Fizzy
 
           reconcile_role(user)
           reconcile_accesses(account, user)
+          ProjectGroups.sync_member(user, claims.groups)
 
           [identity, user, account]
         end

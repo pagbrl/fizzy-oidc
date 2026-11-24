@@ -70,6 +70,9 @@ module Fizzy
         require "fizzy/oidc/patches/boards_controller"
         require "fizzy/oidc/patches/avatars_helper"
         require "fizzy/oidc/patches/avatars_controller"
+        require "fizzy/oidc/patches/access"
+        require "fizzy/oidc/patches/board"
+        require "fizzy/oidc/patches/user"
 
         SessionsController.prepend(Fizzy::Oidc::Patches::SessionsController)
         SignupsController.prepend(Fizzy::Oidc::Patches::SignupsController)
@@ -83,6 +86,9 @@ module Fizzy
         ApplicationController.prepend_view_path(Engine.root.join("app/views/fizzy/oidc/overrides"))
         AvatarsHelper.prepend(Fizzy::Oidc::Patches::AvatarsHelper)
         Users::AvatarsController.prepend(Fizzy::Oidc::Patches::AvatarsController)
+        Access.include(Fizzy::Oidc::Patches::Access)
+        Board.include(Fizzy::Oidc::Patches::Board)
+        User.include(Fizzy::Oidc::Patches::User)
       end
     end
   end

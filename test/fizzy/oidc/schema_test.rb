@@ -26,4 +26,17 @@ class Fizzy::Oidc::SchemaTest < Minitest::Test
 
     assert connection.column_exists?(:sessions, :oidc_id_token, :text)
   end
+
+  def test_creates_the_project_group_tables_once
+    connection = ActiveRecord::Base.connection
+    %i[ oidc_groups oidc_group_memberships oidc_board_groups oidc_group_grants ].each { connection.drop_table it }
+
+    Fizzy::Oidc::Schema.ensure!
+    Fizzy::Oidc::Schema.ensure!
+
+    assert connection.index_exists?(:oidc_groups, [:account_id, :name], unique: true)
+    assert connection.index_exists?(:oidc_group_memberships, [:group_id, :user_id], unique: true)
+    assert connection.index_exists?(:oidc_board_groups, [:board_id, :group_id], unique: true)
+    assert connection.index_exists?(:oidc_group_grants, [:board_id, :user_id], unique: true)
+  end
 end

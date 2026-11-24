@@ -8,6 +8,9 @@ module Fizzy
     class Config
       include Singleton
 
+      # "Projet X", not its admin tier "Projet X Admin".
+      DEFAULT_PROJECT_GROUP_PATTERN = '\AProjet .+(?<! Admin)\z'
+
       def issuer            = ENV.fetch("FIZZY_OIDC_ISSUER")
       def issuer_origin     = URI(issuer).then { |u| "#{u.scheme}://#{u.host}#{":#{u.port}" unless u.port == u.default_port}" }
       def client_id         = ENV.fetch("FIZZY_OIDC_CLIENT_ID")
@@ -25,6 +28,7 @@ module Fizzy
 
       def admin_group       = mapping.dig("mappings", "admin_group")
       def default_boards    = Array(mapping.dig("mappings", "default_boards"))
+      def project_group_pattern = Regexp.new(mapping.dig("mappings", "project_group_pattern") || DEFAULT_PROJECT_GROUP_PATTERN)
 
       def group_boards(group_names)
         boards = group_names.flat_map { |name| Array(groups_mapping.dig(name, "boards")) }
