@@ -14,7 +14,7 @@ Single-tenant: the first OIDC user creates the account and becomes `owner`. Ever
 
 ## Compatibility
 
-Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches fourteen Fizzy classes and overrides five views; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
+Pinned to Fizzy commit `3068c2a7` (Rails 8.x, Ruby 3.4). Monkey-patches fourteen Fizzy classes and overrides six views; expect to revisit on Fizzy upgrades. See [`AGENTS.md`](AGENTS.md) for the upgrade checklist.
 
 ## Install into Fizzy
 
@@ -117,13 +117,27 @@ finds them by OIDC subject as before.
 5. Updates the user's role: `owner` is never downgraded; otherwise `admin` if in `admin_group`, else `member`.
 6. Reconciles `Access` records against the mapping (additive for earned groups, destructive for revoked groups within the managed set).
 7. Sets the user's project groups to the ones in the claim (a leading `/` is dropped), creating a group the first time it is seen, and the accesses those groups give follow (see below).
-7. Starts a Fizzy session and redirects into the app.
+8. Starts a Fizzy session and redirects into the app.
 
 ## Project groups on boards
 
 Whoever can change a board's access can also tick project groups on the same page, under "Groups", with a search by name like the one for people. Ticking a group gives every member access; unticking it takes back the accesses the group gave, unless another ticked group still covers the person. A member who leaves the project loses them at their next login.
 
-An access a person had before a group gave it is theirs: no group ever takes it back. Accesses a group gave are recorded (`oidc_group_grants`), and only those are revoked. A member whose access only a group gives is listed with "via Projet X" and cannot be unticked on their own, from the page or the API (`user_ids[]`): the next login would give it back. On an `all_access` board nothing is revoked, as in Fizzy.
+An access a person had before a group gave it is theirs: no group ever takes it back. Accesses a group gave are recorded (`oidc_group_grants`), and only those are revoked. A member whose access only a group gives is listed with "via Projet X" and cannot be unticked on the page: the next login would give it back. On an `all_access` board no access is revoked, as in Fizzy, but the group's record of it goes: once the group no longer covers someone there, their access is in person.
+
+### For the community manager (JSON API)
+
+The board's JSON (`GET /:account_slug/boards/:id.json`) carries, next to `user_ids`, the members whose access only a group gives, and both are left out on an `all_access` board:
+
+```json
+{ "id": "…", "name": "…", "all_access": false, "user_ids": ["<user id>", "…"], "group_user_ids": ["<user id>", "…"] }
+```
+
+`PUT /:account_slug/boards/:id.json` is upstream's, which requires a `board` object (at least `{"name": …}`). Through the API, `user_ids` wins: a member only a group lets in who is missing from it loses the access, and the group's record with it (on the page they stay locked). The optional top-level `personal_user_ids` makes accesses in person: each listed user who still has access after the save is no longer a group's, so no group takes it back.
+
+```json
+{ "board": { "name": "Infra" }, "user_ids": ["<user id>", "…"], "personal_user_ids": ["<user id>", "…"] }
+```
 
 Membership is the claim at login: someone who never logged in is in no group. The gem's four tables (`oidc_groups`, `oidc_group_memberships`, `oidc_board_groups`, `oidc_group_grants`) are created like the OIDC columns, by `Schema.ensure!` and a migration.
 
@@ -144,7 +158,7 @@ Membership is the claim at login: someone who never logged in is in no group. Th
 | `AvatarsHelper` | `avatar_image_tag` | `loading: "lazy"`, the caller's options win |
 | `Users::AvatarsController` | `show` | The redirect to someone else's uploaded avatar is cached 5 minutes, privately; your own stays uncached so a new photo shows at once |
 
-The board access partial `boards/edit/_users.html.erb` is overridden from `app/views/fizzy/oidc/overrides`: it lists members plus a search instead of the whole account. `dev/board_access_smoke.rb` checks the round trip to `#update` in a real Fizzy.
+The board access partial `boards/edit/_users.html.erb` is overridden from `app/views/fizzy/oidc/overrides`: it lists members plus a search instead of the whole account. So is `boards/show.json.jbuilder`, which adds `group_user_ids`. `dev/board_access_smoke.rb` checks the round trip to `#update` in a real Fizzy.
 
 Logout ends Fizzy's session, then redirects to the IdP's `end_session_endpoint` (from OIDC discovery) with `id_token_hint` and a `post_logout_redirect_uri` pointing at Fizzy's sign-in page — register `https://<fizzy-host>/*` as a valid post-logout redirect URI on the IdP client. If discovery fails, logout stays local.
 
