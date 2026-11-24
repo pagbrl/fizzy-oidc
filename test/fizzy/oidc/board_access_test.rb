@@ -6,8 +6,12 @@ class Fizzy::Oidc::BoardAccessTest < Minitest::Test
     attr_reader :params, :selected_users, :ticked_users, :unselected_users, :group_users, :granted_through,
       :board_groups, :ticked_groups, :unselected_groups, :rendered
 
-    def initialize(board, params)
-      @board, @params = board, params
+    def initialize(board, params, format: :html)
+      @board, @params, @format = board, params, format
+    end
+
+    def request
+      OpenStruct.new(format: OpenStruct.new(json?: @format == :json))
     end
 
     def edit
@@ -99,6 +103,15 @@ class Fizzy::Oidc::BoardAccessTest < Minitest::Test
     assert_equal [ @alice, @bob ], @board.users.alphabetically.to_a
   end
 
+  def test_a_json_save_revokes_a_member_only_a_group_covers_when_user_ids_leaves_them_out
+    dan = in_alpha("Dan")
+
+    update_json(user_ids: [ @alice.id, @bob.id ])
+
+    refute_includes @board.reload.users, dan
+    assert_empty Fizzy::Oidc::GroupGrant.where(board_id: @board.id)
+  end
+
   def test_a_save_without_group_ids_leaves_the_groups_alone
     Fizzy::Oidc::ProjectGroups.attach(@board, [ alpha.id ])
 
@@ -126,6 +139,17 @@ class Fizzy::Oidc::BoardAccessTest < Minitest::Test
 
     def update(**params)
       Controller.new(@board, params).tap(&:update)
+    end
+
+    def update_json(**params)
+      Controller.new(@board, params, format: :json).tap(&:update)
+    end
+
+    def in_alpha(name)
+      person(name).tap do |user|
+        Fizzy::Oidc::GroupMembership.create!(group: alpha, user:)
+        Fizzy::Oidc::ProjectGroups.attach(@board, [ alpha.id ])
+      end
     end
 
     def alpha

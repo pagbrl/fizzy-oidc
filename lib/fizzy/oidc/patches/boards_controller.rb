@@ -27,8 +27,10 @@ module Fizzy
         # The search buttons submit the board's form, so what was ticked in an
         # earlier search comes back ticked. They never save.
         #
-        # A member only a group lets in stays whatever user_ids says, from the
-        # page or the API: the next login would give the access back anyway.
+        # On the page, a member only a group lets in is locked: unticking
+        # them would last until their next login. Through the API, user_ids
+        # wins, as the community manager knows memberships fresher than the
+        # last login.
         # Groups change after upstream's save, which would otherwise revoke the
         # members a newly attached group just let in.
         def update
@@ -36,9 +38,14 @@ module Fizzy
             edit
             render :edit
           else
-            params[:user_ids] = Array(params[:user_ids]) + ProjectGroups.granted_through(@board).keys if params.key?(:user_ids)
-            super
-            ProjectGroups.attach(@board, Array(params[:group_ids]).compact_blank) if params.key?(:group_ids)
+            if params.key?(:user_ids) && !request.format.json?
+              params[:user_ids] = Array(params[:user_ids]) + ProjectGroups.granted_through(@board).keys
+            end
+
+            @board.class.transaction do
+              super
+              ProjectGroups.attach(@board, Array(params[:group_ids]).compact_blank) if params.key?(:group_ids)
+            end
           end
         end
       end
