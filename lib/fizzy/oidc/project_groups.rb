@@ -65,8 +65,9 @@ module Fizzy
         needle = People.fold(query)
         groups = addable(board).order(:name).pluck(:id, :name)
         groups = needle.empty? ? groups.sort_by { |_, name| People.fold(name) == People.fold(board.name) ? 0 : 1 } : groups.select { |_, name| People.fold(name).include?(needle) }
-        ids = groups.first(SEARCH_LIMIT).map(&:first)
-        Group.where(id: ids).in_order_of(:id, ids)
+        groups = groups.first(SEARCH_LIMIT)
+        # By name: in_order_of casts the binary UUID ids wrong on MySQL and matches nothing.
+        Group.where(id: groups.map(&:first)).in_order_of(:name, groups.map(&:last))
       end
 
       def covered_users(board)
