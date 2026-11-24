@@ -196,7 +196,16 @@ class Fizzy::Oidc::ProjectGroupsTest < Minitest::Test
     attach "Projet Alpha"
 
     assert_equal [ "Projet Alphonse" ], ProjectGroups.addable_to(@board, "alph").pluck(:name)
-    assert_empty ProjectGroups.addable_to(@board, " ")
+  end
+
+  # Without a query the page still offers groups: a board's own project group
+  # first, as it is the one its admins come for.
+  def test_without_a_query_the_groups_are_offered_the_boards_namesake_first
+    %w[ Alpha Beta Gamma ].each { |name| Group.create!(account: @account, name: "Projet #{name}") }
+    @board.update!(name: "Projet Gamma")
+    attach "Projet Alpha"
+
+    assert_equal [ "Projet Gamma", "Projet Beta" ], ProjectGroups.addable_to(@board, " ").pluck(:name)
   end
 
   private

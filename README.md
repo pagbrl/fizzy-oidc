@@ -121,7 +121,7 @@ finds them by OIDC subject as before.
 
 ## Project groups on boards
 
-Whoever can change a board's access can also tick project groups on the same page, under "Groups", with a search by name like the one for people. Ticking a group gives every member access; unticking it takes back the accesses the group gave, unless another ticked group still covers the person. A member who leaves the project loses them at their next login.
+Whoever can change a board's access can also tick project groups on the same page, under "Groups". Up to 20 groups are offered without a search, the one named like the board first, and a search by name finds the others, like the one for people. Ticking a group gives every member access; unticking it takes back the accesses the group gave, unless another ticked group still covers the person. A member who leaves the project loses them at their next login.
 
 An access a person had before a group gave it is theirs: no group ever takes it back. Accesses a group gave are recorded (`oidc_group_grants`), and only those are revoked. A member whose access only a group gives is listed with "via Projet X" and cannot be unticked on the page: the next login would give it back. On an `all_access` board no access is revoked, as in Fizzy, but the group's record of it goes: once the group no longer covers someone there, their access is in person.
 

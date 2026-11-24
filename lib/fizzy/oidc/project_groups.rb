@@ -63,10 +63,10 @@ module Fizzy
 
       def addable_to(board, query)
         needle = People.fold(query)
-        return Group.none if needle.empty?
-
-        ids = addable(board).order(:name).pluck(:id, :name).select { |_, name| People.fold(name).include?(needle) }.first(SEARCH_LIMIT).map(&:first)
-        Group.where(id: ids).order(:name)
+        groups = addable(board).order(:name).pluck(:id, :name)
+        groups = needle.empty? ? groups.sort_by { |_, name| People.fold(name) == People.fold(board.name) ? 0 : 1 } : groups.select { |_, name| People.fold(name).include?(needle) }
+        ids = groups.first(SEARCH_LIMIT).map(&:first)
+        Group.where(id: ids).in_order_of(:id, ids)
       end
 
       def covered_users(board)
