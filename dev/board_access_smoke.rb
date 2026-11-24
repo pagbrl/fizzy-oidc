@@ -105,6 +105,24 @@ begin
   form.css('input[name="group_ids[]"][checked]').each { it.remove_attribute("checked") }
   app.post board_path, params: fields(form), headers: form_post
   check "unticking the group takes back only its access", members, board.reload.users.ids
+
+  # The community manager's side: GET and PUT the board as JSON.
+  json = { "Accept" => "application/json", "Sec-Fetch-Site" => "same-origin" }
+  attach = -> { app.post board_path, params: fields(form, "group_ids[]" => group.id), headers: form_post }
+  board_json = -> { app.get "#{board_path}.json", headers: json; JSON.parse(app.response.body) }
+  put_json = ->(body) { app.put "#{board_path}.json", params: { board: { name: board.name } }.merge(body).to_json, headers: json.merge("Content-Type" => "application/json") }
+
+  attach.call
+  check "the board's JSON lists the member only a group lets in", [ grouped.id ], board_json.call["group_user_ids"]
+  put_json.call(user_ids: members)
+  raise "PUT JSON: #{app.response.status}" unless app.response.successful?
+  check "a JSON save leaving them out of user_ids revokes them", members, board.reload.users.ids
+  check "their group grant goes with the access", [], Fizzy::Oidc::GroupGrant.where(board_id: board.id).pluck(:user_id)
+
+  attach.call
+  put_json.call(user_ids: members + [ grouped.id ], personal_user_ids: [ grouped.id ])
+  check "personal_user_ids keeps the access", members + [ grouped.id ], board.reload.users.ids
+  check "and makes it in person", [], board_json.call["group_user_ids"]
 ensure
   Rails.application.executor.wrap do
     group&.destroy!
